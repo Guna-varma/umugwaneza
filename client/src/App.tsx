@@ -24,9 +24,11 @@ import VehiclesPage from "@/pages/vehicles";
 import ExternalOwnersPage from "@/pages/external-owners";
 import RentalsPage from "@/pages/rentals";
 import ReportsPage from "@/pages/reports";
+import NotificationsPage from "@/pages/notifications";
 import AdminBusinessesPage from "@/pages/admin-businesses";
 import AdminOwnersPage from "@/pages/admin-owners";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { NotificationBell } from "@/components/notification-bell";
 
 function OwnerRouter() {
   return (
@@ -43,6 +45,7 @@ function OwnerRouter() {
       <Route path="/rentals/outgoing">{() => <RentalsPage direction="OUTGOING" />}</Route>
       <Route path="/rentals/incoming">{() => <RentalsPage direction="INCOMING" />}</Route>
       <Route path="/reports" component={ReportsPage} />
+      <Route path="/notifications" component={NotificationsPage} />
       <Route path="/">{() => <Redirect to="/dashboard" />}</Route>
       <Route component={NotFound} />
     </Switch>
@@ -80,7 +83,10 @@ function AuthenticatedLayout() {
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <span className="text-sm font-medium text-[#1e293b]">{t("app.name")}</span>
             </div>
-            <LanguageSwitcher />
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <LanguageSwitcher />
+            </div>
           </header>
           <main className="flex-1 overflow-auto">
             <div className="animate-page-fade">

@@ -14,6 +14,7 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   FileText,
+  Bell,
   Building2,
   LogOut,
 } from "lucide-react";
@@ -71,6 +72,7 @@ export function AppSidebar() {
       label: t("nav.reporting"),
       items: [
         { title: t("nav.reports"), url: "/reports", icon: FileText },
+        { title: t("nav.notifications"), url: "/notifications", icon: Bell },
       ],
     },
   ];

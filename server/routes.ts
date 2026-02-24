@@ -470,36 +470,372 @@ export async function registerRoutes(
     });
   });
 
+  // ==================== RENTAL PAYMENTS (GET) ====================
+  app.get("/api/rental-payments", async (_req, res) => {
+    const { data, error } = await supabase.from("rental_payments").select("*, rental_contract:rental_contracts(*, vehicle:fleet_vehicles(*), customer:customers(*), external_owner:external_asset_owners(*))").eq("business_id", BUSINESS_ID).order("created_at", { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  });
+
+  app.get("/api/rental-contracts-pending", async (_req, res) => {
+    const { data, error } = await supabase.from("rental_contracts").select("*, vehicle:fleet_vehicles(*), customer:customers(*), external_owner:external_asset_owners(*)").eq("business_id", BUSINESS_ID).gt("remaining_amount", 0).order("created_at", { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  });
+
   // ==================== REPORTS ====================
+
+  function buildUnifiedRows(purchasesData: any[], salesData: any[], outgoingData: any[], incomingData: any[]) {
+    const rows: any[] = [];
+    for (const p of purchasesData) {
+      rows.push({ date: p.purchase_date, type: "Purchase", reference: p.reference_no, party: p.supplier?.supplier_name || "—", item_vehicle: p.item?.item_name || "—", quantity: `${p.total_quantity} ${p.unit}`, unit: p.unit, unit_price: p.unit_price, total: p.total_purchase_cost, paid: p.amount_paid, remaining: p.remaining_amount, status: p.financial_status });
+    }
+    for (const s of salesData) {
+      rows.push({ date: s.sale_date, type: "Sale", reference: s.reference_no, party: s.customer?.customer_name || "—", item_vehicle: s.item?.item_name || "—", quantity: `${s.total_quantity} ${s.unit}`, unit: s.unit, unit_price: s.unit_price, total: s.total_sale_amount, paid: s.amount_received, remaining: s.remaining_amount, status: s.financial_status });
+    }
+    for (const r of outgoingData) {
+      rows.push({ date: (r.rental_start_datetime || "").split("T")[0], type: "Rental Out", reference: `RNT-${r.id.slice(0, 8)}`, party: r.customer?.customer_name || "—", item_vehicle: r.vehicle?.vehicle_name || "—", quantity: "—", unit: "—", unit_price: r.rate, total: r.total_amount, paid: r.amount_paid, remaining: r.remaining_amount, status: r.financial_status });
+    }
+    for (const r of incomingData) {
+      rows.push({ date: (r.rental_start_datetime || "").split("T")[0], type: "Rental In", reference: `RNT-${r.id.slice(0, 8)}`, party: r.external_owner?.owner_name || "—", item_vehicle: r.vehicle?.vehicle_name || "—", quantity: "—", unit: "—", unit_price: r.rate, total: r.total_amount, paid: r.amount_paid, remaining: r.remaining_amount, status: r.financial_status });
+    }
+    return rows;
+  }
+
+  function computeSummary(rows: any[]) {
+    const totalPurchase = rows.filter(r => r.type === "Purchase").reduce((s, r) => s + r.total, 0);
+    const totalSales = rows.filter(r => r.type === "Sale").reduce((s, r) => s + r.total, 0);
+    const totalRentalRevenue = rows.filter(r => r.type === "Rental Out").reduce((s, r) => s + r.total, 0);
+    const totalRentalCost = rows.filter(r => r.type === "Rental In").reduce((s, r) => s + r.total, 0);
+    const totalPaid = rows.reduce((s, r) => s + (r.paid || 0), 0);
+    const totalReceived = rows.filter(r => r.type === "Sale").reduce((s, r) => s + (r.paid || 0), 0);
+    const totalOutstandingPayables = rows.filter(r => r.type === "Purchase" || r.type === "Rental In").reduce((s, r) => s + (r.remaining || 0), 0);
+    const totalOutstandingReceivables = rows.filter(r => r.type === "Sale" || r.type === "Rental Out").reduce((s, r) => s + (r.remaining || 0), 0);
+    return { totalPurchase, totalSales, totalRentalRevenue, totalRentalCost, totalPaid, totalReceived, totalOutstandingPayables, totalOutstandingReceivables, netProfit: totalSales - totalPurchase + totalRentalRevenue - totalRentalCost };
+  }
+
   app.get("/api/reports/daily", async (req, res) => {
     const date = req.query.date as string || new Date().toISOString().split("T")[0];
     const [purchasesRes, salesRes, outgoingRes, incomingRes] = await Promise.all([
       supabase.from("purchases").select("*, supplier:suppliers(*), item:items(*)").eq("business_id", BUSINESS_ID).eq("purchase_date", date),
       supabase.from("sales").select("*, customer:customers(*), item:items(*)").eq("business_id", BUSINESS_ID).eq("sale_date", date),
-      supabase.from("rental_contracts").select("*, vehicle:vehicles(*), customer:customers(*)").eq("business_id", BUSINESS_ID).eq("rental_direction", "OUTGOING").gte("rental_start_datetime", date + "T00:00:00").lte("rental_start_datetime", date + "T23:59:59"),
-      supabase.from("rental_contracts").select("*, vehicle:vehicles(*), external_owner:external_asset_owners(*)").eq("business_id", BUSINESS_ID).eq("rental_direction", "INCOMING").gte("rental_start_datetime", date + "T00:00:00").lte("rental_start_datetime", date + "T23:59:59"),
+      supabase.from("rental_contracts").select("*, vehicle:fleet_vehicles(*), customer:customers(*)").eq("business_id", BUSINESS_ID).eq("rental_direction", "OUTGOING").gte("rental_start_datetime", date + "T00:00:00").lte("rental_start_datetime", date + "T23:59:59"),
+      supabase.from("rental_contracts").select("*, vehicle:fleet_vehicles(*), external_owner:external_asset_owners(*)").eq("business_id", BUSINESS_ID).eq("rental_direction", "INCOMING").gte("rental_start_datetime", date + "T00:00:00").lte("rental_start_datetime", date + "T23:59:59"),
     ]);
+    const rows = buildUnifiedRows(purchasesRes.data || [], salesRes.data || [], outgoingRes.data || [], incomingRes.data || []);
+    res.json({ rows, ...computeSummary(rows) });
+  });
 
-    const rows: any[] = [];
+  app.get("/api/reports/monthly", async (req, res) => {
+    const month = parseInt(req.query.month as string) || new Date().getMonth() + 1;
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    const fromDate = `${year}-${String(month).padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const toDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    const [purchasesRes, salesRes, outgoingRes, incomingRes] = await Promise.all([
+      supabase.from("purchases").select("*, supplier:suppliers(*), item:items(*)").eq("business_id", BUSINESS_ID).gte("purchase_date", fromDate).lte("purchase_date", toDate),
+      supabase.from("sales").select("*, customer:customers(*), item:items(*)").eq("business_id", BUSINESS_ID).gte("sale_date", fromDate).lte("sale_date", toDate),
+      supabase.from("rental_contracts").select("*, vehicle:fleet_vehicles(*), customer:customers(*)").eq("business_id", BUSINESS_ID).eq("rental_direction", "OUTGOING").gte("rental_start_datetime", fromDate + "T00:00:00").lte("rental_start_datetime", toDate + "T23:59:59"),
+      supabase.from("rental_contracts").select("*, vehicle:fleet_vehicles(*), external_owner:external_asset_owners(*)").eq("business_id", BUSINESS_ID).eq("rental_direction", "INCOMING").gte("rental_start_datetime", fromDate + "T00:00:00").lte("rental_start_datetime", toDate + "T23:59:59"),
+    ]);
+    const rows = buildUnifiedRows(purchasesRes.data || [], salesRes.data || [], outgoingRes.data || [], incomingRes.data || []);
+    res.json({ rows, ...computeSummary(rows) });
+  });
+
+  app.get("/api/reports/custom", async (req, res) => {
+    const fromDate = req.query.from as string;
+    const toDate = req.query.to as string;
+    if (!fromDate || !toDate) return res.status(400).json({ error: "from and to dates required" });
+    const [purchasesRes, salesRes, outgoingRes, incomingRes] = await Promise.all([
+      supabase.from("purchases").select("*, supplier:suppliers(*), item:items(*)").eq("business_id", BUSINESS_ID).gte("purchase_date", fromDate).lte("purchase_date", toDate),
+      supabase.from("sales").select("*, customer:customers(*), item:items(*)").eq("business_id", BUSINESS_ID).gte("sale_date", fromDate).lte("sale_date", toDate),
+      supabase.from("rental_contracts").select("*, vehicle:fleet_vehicles(*), customer:customers(*)").eq("business_id", BUSINESS_ID).eq("rental_direction", "OUTGOING").gte("rental_start_datetime", fromDate + "T00:00:00").lte("rental_start_datetime", toDate + "T23:59:59"),
+      supabase.from("rental_contracts").select("*, vehicle:fleet_vehicles(*), external_owner:external_asset_owners(*)").eq("business_id", BUSINESS_ID).eq("rental_direction", "INCOMING").gte("rental_start_datetime", fromDate + "T00:00:00").lte("rental_start_datetime", toDate + "T23:59:59"),
+    ]);
+    const rows = buildUnifiedRows(purchasesRes.data || [], salesRes.data || [], outgoingRes.data || [], incomingRes.data || []);
+    res.json({ rows, ...computeSummary(rows) });
+  });
+
+  app.get("/api/reports/purchases", async (req, res) => {
+    const fromDate = req.query.from as string;
+    const toDate = req.query.to as string;
+    const supplierId = req.query.supplier_id as string;
+    let query = supabase.from("purchases").select("*, supplier:suppliers(*), item:items(*)").eq("business_id", BUSINESS_ID).order("purchase_date", { ascending: true });
+    if (fromDate) query = query.gte("purchase_date", fromDate);
+    if (toDate) query = query.lte("purchase_date", toDate);
+    if (supplierId) query = query.eq("supplier_id", supplierId);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    const rows = (data || []).map((p: any) => ({
+      date: p.purchase_date, supplier: p.supplier?.supplier_name || "—", item: p.item?.item_name || "—",
+      quantity: p.total_quantity, unit: p.unit, unit_price: p.unit_price,
+      total: p.total_purchase_cost, paid: p.amount_paid, remaining: p.remaining_amount, status: p.financial_status,
+    }));
+    const totalPurchased = rows.reduce((s: number, r: any) => s + r.total, 0);
+    const totalPaid = rows.reduce((s: number, r: any) => s + r.paid, 0);
+    const totalOutstanding = rows.reduce((s: number, r: any) => s + r.remaining, 0);
+    res.json({ rows, totalPurchased, totalPaid, totalOutstanding });
+  });
+
+  app.get("/api/reports/sales", async (req, res) => {
+    const fromDate = req.query.from as string;
+    const toDate = req.query.to as string;
+    const customerId = req.query.customer_id as string;
+    let query = supabase.from("sales").select("*, customer:customers(*), item:items(*)").eq("business_id", BUSINESS_ID).order("sale_date", { ascending: true });
+    if (fromDate) query = query.gte("sale_date", fromDate);
+    if (toDate) query = query.lte("sale_date", toDate);
+    if (customerId) query = query.eq("customer_id", customerId);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    const rows = (data || []).map((s: any) => ({
+      date: s.sale_date, customer: s.customer?.customer_name || "—", item: s.item?.item_name || "—",
+      quantity: s.total_quantity, unit: s.unit, unit_price: s.unit_price,
+      total: s.total_sale_amount, received: s.amount_received, remaining: s.remaining_amount, status: s.financial_status,
+    }));
+    const totalSales = rows.reduce((s: number, r: any) => s + r.total, 0);
+    const totalReceived = rows.reduce((s: number, r: any) => s + r.received, 0);
+    const totalOutstanding = rows.reduce((s: number, r: any) => s + r.remaining, 0);
+    res.json({ rows, totalSales, totalReceived, totalOutstanding, netProfit: totalSales });
+  });
+
+  app.get("/api/reports/profit", async (req, res) => {
+    const fromDate = req.query.from as string;
+    const toDate = req.query.to as string;
+    let purchaseQuery = supabase.from("purchases").select("purchase_date, total_purchase_cost").eq("business_id", BUSINESS_ID);
+    let salesQuery = supabase.from("sales").select("sale_date, total_sale_amount").eq("business_id", BUSINESS_ID);
+    if (fromDate) { purchaseQuery = purchaseQuery.gte("purchase_date", fromDate); salesQuery = salesQuery.gte("sale_date", fromDate); }
+    if (toDate) { purchaseQuery = purchaseQuery.lte("purchase_date", toDate); salesQuery = salesQuery.lte("sale_date", toDate); }
+    const [pRes, sRes] = await Promise.all([purchaseQuery, salesQuery]);
+    const dateMap: Record<string, { sales: number; purchases: number }> = {};
+    for (const p of pRes.data || []) {
+      if (!dateMap[p.purchase_date]) dateMap[p.purchase_date] = { sales: 0, purchases: 0 };
+      dateMap[p.purchase_date].purchases += p.total_purchase_cost;
+    }
+    for (const s of sRes.data || []) {
+      if (!dateMap[s.sale_date]) dateMap[s.sale_date] = { sales: 0, purchases: 0 };
+      dateMap[s.sale_date].sales += s.total_sale_amount;
+    }
+    const rows = Object.entries(dateMap).sort(([a], [b]) => a.localeCompare(b)).map(([date, v]) => ({
+      date, totalSales: v.sales, totalPurchases: v.purchases, profit: v.sales - v.purchases,
+    }));
+    const grandTotalSales = rows.reduce((s, r) => s + r.totalSales, 0);
+    const grandTotalPurchases = rows.reduce((s, r) => s + r.totalPurchases, 0);
+    res.json({ rows, grandTotalSales, grandTotalPurchases, netProfit: grandTotalSales - grandTotalPurchases });
+  });
+
+  app.get("/api/reports/outstanding-payables", async (req, res) => {
+    const supplierId = req.query.supplier_id as string;
+    let query = supabase.from("purchases").select("*, supplier:suppliers(*), item:items(*)").eq("business_id", BUSINESS_ID).gt("remaining_amount", 0).order("purchase_date", { ascending: true });
+    if (supplierId) query = query.eq("supplier_id", supplierId);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    const rows = (data || []).map((p: any) => ({
+      date: p.purchase_date, supplier: p.supplier?.supplier_name || "—", item: p.item?.item_name || "—",
+      total: p.total_purchase_cost, paid: p.amount_paid, remaining: p.remaining_amount, status: p.financial_status,
+    }));
+    const totalOutstanding = rows.reduce((s: number, r: any) => s + r.remaining, 0);
+    res.json({ rows, totalOutstanding });
+  });
+
+  app.get("/api/reports/outstanding-receivables", async (req, res) => {
+    const customerId = req.query.customer_id as string;
+    let query = supabase.from("sales").select("*, customer:customers(*), item:items(*)").eq("business_id", BUSINESS_ID).gt("remaining_amount", 0).order("sale_date", { ascending: true });
+    if (customerId) query = query.eq("customer_id", customerId);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    const rows = (data || []).map((s: any) => ({
+      date: s.sale_date, customer: s.customer?.customer_name || "—", item: s.item?.item_name || "—",
+      total: s.total_sale_amount, received: s.amount_received, remaining: s.remaining_amount, status: s.financial_status,
+    }));
+    const totalOutstanding = rows.reduce((s: number, r: any) => s + r.remaining, 0);
+    res.json({ rows, totalOutstanding });
+  });
+
+  app.get("/api/reports/stock-summary", async (req, res) => {
+    const [purchasesRes, salesRes, itemsRes] = await Promise.all([
+      supabase.from("purchases").select("item_id, total_quantity").eq("business_id", BUSINESS_ID),
+      supabase.from("sales").select("item_id, total_quantity").eq("business_id", BUSINESS_ID),
+      supabase.from("items").select("*").eq("business_id", BUSINESS_ID).eq("is_active", true),
+    ]);
+    const purchasedMap: Record<string, number> = {};
+    for (const p of purchasesRes.data || []) { purchasedMap[p.item_id] = (purchasedMap[p.item_id] || 0) + p.total_quantity; }
+    const soldMap: Record<string, number> = {};
+    for (const s of salesRes.data || []) { soldMap[s.item_id] = (soldMap[s.item_id] || 0) + s.total_quantity; }
+    const rows = (itemsRes.data || []).map((item: any) => {
+      const purchased = purchasedMap[item.id] || 0;
+      const sold = soldMap[item.id] || 0;
+      return { item: item.item_name, totalPurchased: purchased, totalSold: sold, currentStock: purchased - sold, unit: item.base_unit, measurementType: item.measurement_type };
+    });
+    res.json({ rows });
+  });
+
+  app.get("/api/reports/supplier-ledger", async (req, res) => {
+    const supplierId = req.query.supplier_id as string;
+    const fromDate = req.query.from as string;
+    const toDate = req.query.to as string;
+    if (!supplierId) return res.status(400).json({ error: "supplier_id required" });
+    let purchaseQuery = supabase.from("purchases").select("reference_no, purchase_date, total_purchase_cost").eq("business_id", BUSINESS_ID).eq("supplier_id", supplierId).order("purchase_date", { ascending: true });
+    let paymentQuery = supabase.from("grocery_payments").select("reference_id, payment_date, amount").eq("business_id", BUSINESS_ID).eq("reference_type", "PURCHASE").order("payment_date", { ascending: true });
+    if (fromDate) { purchaseQuery = purchaseQuery.gte("purchase_date", fromDate); paymentQuery = paymentQuery.gte("payment_date", fromDate); }
+    if (toDate) { purchaseQuery = purchaseQuery.lte("purchase_date", toDate); paymentQuery = paymentQuery.lte("payment_date", toDate); }
+    const [pRes, pmtRes] = await Promise.all([purchaseQuery, paymentQuery]);
+    const entries: any[] = [];
+    for (const p of pRes.data || []) {
+      entries.push({ date: p.purchase_date, reference: p.reference_no, purchaseAmount: p.total_purchase_cost, paymentAmount: 0 });
+    }
+    for (const pm of pmtRes.data || []) {
+      entries.push({ date: pm.payment_date, reference: `PMT-${pm.reference_id.slice(0, 8)}`, purchaseAmount: 0, paymentAmount: pm.amount });
+    }
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+    let balance = 0;
+    const rows = entries.map(e => {
+      balance = balance + e.purchaseAmount - e.paymentAmount;
+      return { ...e, balance };
+    });
+    res.json({ rows, finalBalance: balance });
+  });
+
+  app.get("/api/reports/customer-ledger", async (req, res) => {
+    const customerId = req.query.customer_id as string;
+    const fromDate = req.query.from as string;
+    const toDate = req.query.to as string;
+    if (!customerId) return res.status(400).json({ error: "customer_id required" });
+    let salesQuery = supabase.from("sales").select("reference_no, sale_date, total_sale_amount").eq("business_id", BUSINESS_ID).eq("customer_id", customerId).order("sale_date", { ascending: true });
+    let paymentQuery = supabase.from("grocery_payments").select("reference_id, payment_date, amount").eq("business_id", BUSINESS_ID).eq("reference_type", "SALE").order("payment_date", { ascending: true });
+    if (fromDate) { salesQuery = salesQuery.gte("sale_date", fromDate); paymentQuery = paymentQuery.gte("payment_date", fromDate); }
+    if (toDate) { salesQuery = salesQuery.lte("sale_date", toDate); paymentQuery = paymentQuery.lte("payment_date", toDate); }
+    const [sRes, pmtRes] = await Promise.all([salesQuery, paymentQuery]);
+    const entries: any[] = [];
+    for (const s of sRes.data || []) {
+      entries.push({ date: s.sale_date, reference: s.reference_no, saleAmount: s.total_sale_amount, paymentAmount: 0 });
+    }
+    for (const pm of pmtRes.data || []) {
+      entries.push({ date: pm.payment_date, reference: `PMT-${pm.reference_id.slice(0, 8)}`, saleAmount: 0, paymentAmount: pm.amount });
+    }
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+    let balance = 0;
+    const rows = entries.map(e => {
+      balance = balance + e.saleAmount - e.paymentAmount;
+      return { ...e, balance };
+    });
+    res.json({ rows, finalBalance: balance });
+  });
+
+  app.get("/api/reports/rental-outgoing", async (req, res) => {
+    const fromDate = req.query.from as string;
+    const toDate = req.query.to as string;
+    let query = supabase.from("rental_contracts").select("*, vehicle:fleet_vehicles(*), customer:customers(*)").eq("business_id", BUSINESS_ID).eq("rental_direction", "OUTGOING").order("rental_start_datetime", { ascending: true });
+    if (fromDate) query = query.gte("rental_start_datetime", fromDate + "T00:00:00");
+    if (toDate) query = query.lte("rental_start_datetime", toDate + "T23:59:59");
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    const rows = (data || []).map((r: any) => ({
+      customer: r.customer?.customer_name || "—", vehicle: r.vehicle?.vehicle_name || "—",
+      period: `${(r.rental_start_datetime || "").split("T")[0]} to ${(r.rental_end_datetime || "").split("T")[0]}`,
+      total: r.total_amount, paid: r.amount_paid, remaining: r.remaining_amount, status: r.financial_status,
+    }));
+    const totalRevenue = rows.reduce((s: number, r: any) => s + r.total, 0);
+    const totalReceived = rows.reduce((s: number, r: any) => s + r.paid, 0);
+    const totalOutstanding = rows.reduce((s: number, r: any) => s + r.remaining, 0);
+    res.json({ rows, totalRevenue, totalReceived, totalOutstanding });
+  });
+
+  app.get("/api/reports/rental-incoming", async (req, res) => {
+    const fromDate = req.query.from as string;
+    const toDate = req.query.to as string;
+    let query = supabase.from("rental_contracts").select("*, vehicle:fleet_vehicles(*), external_owner:external_asset_owners(*)").eq("business_id", BUSINESS_ID).eq("rental_direction", "INCOMING").order("rental_start_datetime", { ascending: true });
+    if (fromDate) query = query.gte("rental_start_datetime", fromDate + "T00:00:00");
+    if (toDate) query = query.lte("rental_start_datetime", toDate + "T23:59:59");
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    const rows = (data || []).map((r: any) => ({
+      externalOwner: r.external_owner?.owner_name || "—", vehicle: r.vehicle?.vehicle_name || "—",
+      period: `${(r.rental_start_datetime || "").split("T")[0]} to ${(r.rental_end_datetime || "").split("T")[0]}`,
+      total: r.total_amount, paid: r.amount_paid, remaining: r.remaining_amount, status: r.financial_status,
+    }));
+    const totalCost = rows.reduce((s: number, r: any) => s + r.total, 0);
+    const totalPaid = rows.reduce((s: number, r: any) => s + r.paid, 0);
+    const totalOutstanding = rows.reduce((s: number, r: any) => s + r.remaining, 0);
+    res.json({ rows, totalCost, totalPaid, totalOutstanding });
+  });
+
+  app.get("/api/reports/vehicle-utilization", async (req, res) => {
+    const fromDate = req.query.from as string;
+    const toDate = req.query.to as string;
+    const { data: vehicles } = await supabase.from("fleet_vehicles").select("*").eq("business_id", BUSINESS_ID);
+    let rentalQuery = supabase.from("rental_contracts").select("vehicle_id, rental_direction, total_amount, rental_start_datetime, rental_end_datetime").eq("business_id", BUSINESS_ID);
+    if (fromDate) rentalQuery = rentalQuery.gte("rental_start_datetime", fromDate + "T00:00:00");
+    if (toDate) rentalQuery = rentalQuery.lte("rental_start_datetime", toDate + "T23:59:59");
+    const { data: rentals } = await rentalQuery;
+    const vehicleMap: Record<string, { totalDays: number; totalRevenue: number; rentalCount: number }> = {};
+    for (const r of rentals || []) {
+      if (!vehicleMap[r.vehicle_id]) vehicleMap[r.vehicle_id] = { totalDays: 0, totalRevenue: 0, rentalCount: 0 };
+      const diffMs = new Date(r.rental_end_datetime).getTime() - new Date(r.rental_start_datetime).getTime();
+      const days = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+      vehicleMap[r.vehicle_id].totalDays += days;
+      if (r.rental_direction === "OUTGOING") vehicleMap[r.vehicle_id].totalRevenue += r.total_amount;
+      vehicleMap[r.vehicle_id].rentalCount++;
+    }
+    const periodDays = fromDate && toDate ? Math.max(1, Math.ceil((new Date(toDate).getTime() - new Date(fromDate).getTime()) / (1000 * 60 * 60 * 24))) : 30;
+    const rows = (vehicles || []).map((v: any) => {
+      const usage = vehicleMap[v.id] || { totalDays: 0, totalRevenue: 0, rentalCount: 0 };
+      return { vehicle: v.vehicle_name, type: v.vehicle_type, totalRentalDays: usage.totalDays, totalRevenue: usage.totalRevenue, rentalCount: usage.rentalCount, availability: Math.max(0, Math.round((1 - usage.totalDays / periodDays) * 100)) };
+    });
+    res.json({ rows });
+  });
+
+  app.get("/api/reports/rental-profit", async (req, res) => {
+    const fromDate = req.query.from as string;
+    const toDate = req.query.to as string;
+    let outQuery = supabase.from("rental_contracts").select("total_amount, rental_start_datetime").eq("business_id", BUSINESS_ID).eq("rental_direction", "OUTGOING");
+    let inQuery = supabase.from("rental_contracts").select("total_amount, rental_start_datetime").eq("business_id", BUSINESS_ID).eq("rental_direction", "INCOMING");
+    if (fromDate) { outQuery = outQuery.gte("rental_start_datetime", fromDate + "T00:00:00"); inQuery = inQuery.gte("rental_start_datetime", fromDate + "T00:00:00"); }
+    if (toDate) { outQuery = outQuery.lte("rental_start_datetime", toDate + "T23:59:59"); inQuery = inQuery.lte("rental_start_datetime", toDate + "T23:59:59"); }
+    const [outRes, inRes] = await Promise.all([outQuery, inQuery]);
+    const totalRevenue = (outRes.data || []).reduce((s: number, r: any) => s + r.total_amount, 0);
+    const totalCost = (inRes.data || []).reduce((s: number, r: any) => s + r.total_amount, 0);
+    res.json({ totalRevenue, totalCost, netProfit: totalRevenue - totalCost, outgoingCount: (outRes.data || []).length, incomingCount: (inRes.data || []).length });
+  });
+
+  // ==================== NOTIFICATIONS ====================
+  app.get("/api/notifications", async (_req, res) => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const [purchasesRes, salesRes, grocPayRes, rentalPayRes, contractsRes, vehiclesRes] = await Promise.all([
+      supabase.from("purchases").select("*, supplier:suppliers(supplier_name), item:items(item_name)").eq("business_id", BUSINESS_ID).gte("created_at", sevenDaysAgo + "T00:00:00").order("created_at", { ascending: false }).limit(20),
+      supabase.from("sales").select("*, customer:customers(customer_name), item:items(item_name)").eq("business_id", BUSINESS_ID).gte("created_at", sevenDaysAgo + "T00:00:00").order("created_at", { ascending: false }).limit(20),
+      supabase.from("grocery_payments").select("*").eq("business_id", BUSINESS_ID).gte("created_at", sevenDaysAgo + "T00:00:00").order("created_at", { ascending: false }).limit(10),
+      supabase.from("rental_payments").select("*, rental_contract:rental_contracts(vehicle_id)").eq("business_id", BUSINESS_ID).gte("created_at", sevenDaysAgo + "T00:00:00").order("created_at", { ascending: false }).limit(10),
+      supabase.from("rental_contracts").select("*, vehicle:fleet_vehicles(vehicle_name), customer:customers(customer_name), external_owner:external_asset_owners(owner_name)").eq("business_id", BUSINESS_ID).gte("created_at", sevenDaysAgo + "T00:00:00").order("created_at", { ascending: false }).limit(10),
+      supabase.from("fleet_vehicles").select("*").eq("business_id", BUSINESS_ID).neq("current_status", "AVAILABLE").limit(10),
+    ]);
+    const notifications: any[] = [];
     for (const p of purchasesRes.data || []) {
-      rows.push({ type: "Purchase", reference: p.reference_no, party: p.supplier?.supplier_name || "—", item_vehicle: p.item?.item_name || "—", quantity: `${p.total_quantity} ${p.unit}`, total: p.total_purchase_cost, paid: p.amount_paid, remaining: p.remaining_amount, status: p.financial_status });
+      notifications.push({ id: `pur-${p.id}`, type: "purchase", title: `Purchase: ${p.reference_no}`, description: `${p.item?.item_name || "Item"} from ${p.supplier?.supplier_name || "supplier"} - ${p.total_purchase_cost} RWF`, timestamp: p.created_at, status: p.financial_status });
     }
     for (const s of salesRes.data || []) {
-      rows.push({ type: "Sale", reference: s.reference_no, party: s.customer?.customer_name || "—", item_vehicle: s.item?.item_name || "—", quantity: `${s.total_quantity} ${s.unit}`, total: s.total_sale_amount, paid: s.amount_received, remaining: s.remaining_amount, status: s.financial_status });
+      notifications.push({ id: `sal-${s.id}`, type: "sale", title: `Sale: ${s.reference_no}`, description: `${s.item?.item_name || "Item"} to ${s.customer?.customer_name || "customer"} - ${s.total_sale_amount} RWF`, timestamp: s.created_at, status: s.financial_status });
     }
-    for (const r of outgoingRes.data || []) {
-      rows.push({ type: "Rental Out", reference: `RNT-${r.id.slice(0, 8)}`, party: r.customer?.customer_name || "—", item_vehicle: r.vehicle?.vehicle_name || "—", quantity: "—", total: r.total_amount, paid: r.amount_paid, remaining: r.remaining_amount, status: r.financial_status });
+    for (const gp of grocPayRes.data || []) {
+      notifications.push({ id: `gpay-${gp.id}`, type: "payment", title: `Payment: ${gp.reference_type}`, description: `${gp.amount} RWF via ${gp.mode}`, timestamp: gp.created_at, status: "COMPLETED" });
     }
-    for (const r of incomingRes.data || []) {
-      rows.push({ type: "Rental In", reference: `RNT-${r.id.slice(0, 8)}`, party: r.external_owner?.owner_name || "—", item_vehicle: r.vehicle?.vehicle_name || "—", quantity: "—", total: r.total_amount, paid: r.amount_paid, remaining: r.remaining_amount, status: r.financial_status });
+    for (const rp of rentalPayRes.data || []) {
+      notifications.push({ id: `rpay-${rp.id}`, type: "rental_payment", title: `Rental Payment`, description: `${rp.amount} RWF via ${rp.mode}`, timestamp: rp.created_at, status: "COMPLETED" });
     }
-
-    const totalPurchase = rows.filter(r => r.type === "Purchase").reduce((s, r) => s + r.total, 0);
-    const totalSales = rows.filter(r => r.type === "Sale").reduce((s, r) => s + r.total, 0);
-    const totalRentalRevenue = rows.filter(r => r.type === "Rental Out").reduce((s, r) => s + r.total, 0);
-    const totalRentalCost = rows.filter(r => r.type === "Rental In").reduce((s, r) => s + r.total, 0);
-
-    res.json({ rows, totalPurchase, totalSales, totalRentalRevenue, totalRentalCost, netProfit: totalSales - totalPurchase + totalRentalRevenue - totalRentalCost });
+    for (const rc of contractsRes.data || []) {
+      const party = rc.rental_direction === "OUTGOING" ? rc.customer?.customer_name : rc.external_owner?.owner_name;
+      notifications.push({ id: `rnt-${rc.id}`, type: "rental", title: `Rental ${rc.rental_direction}: ${rc.vehicle?.vehicle_name || "Vehicle"}`, description: `${party || "Party"} - ${rc.total_amount} RWF (${rc.operational_status})`, timestamp: rc.created_at, status: rc.financial_status });
+    }
+    for (const v of vehiclesRes.data || []) {
+      if (v.current_status === "MAINTENANCE") {
+        notifications.push({ id: `veh-${v.id}`, type: "vehicle_alert", title: `Vehicle: ${v.vehicle_name}`, description: `Status: ${v.current_status} at ${v.current_location || "unknown"}`, timestamp: v.updated_at, status: "WARNING" });
+      }
+    }
+    const overduePayables = await supabase.from("purchases").select("reference_no, remaining_amount, supplier:suppliers(supplier_name)").eq("business_id", BUSINESS_ID).gt("remaining_amount", 0);
+    for (const op of overduePayables.data || []) {
+      notifications.push({ id: `overdue-${op.reference_no}`, type: "overdue", title: `Outstanding: ${op.reference_no}`, description: `${op.remaining_amount} RWF to ${op.supplier?.supplier_name || "supplier"}`, timestamp: new Date().toISOString(), status: "PENDING" });
+    }
+    notifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    res.json(notifications.slice(0, 50));
   });
 
   return httpServer;

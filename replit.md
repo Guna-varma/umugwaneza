@@ -47,7 +47,8 @@ Wholesale Trading + Fleet & Machinery Rental web platform using React + Vite + T
 - `/dashboard` - Owner dashboard (authenticated)
 - `/items`, `/suppliers`, `/customers`, `/purchases`, `/sales`, `/payments` - Grocery modules
 - `/vehicles`, `/external-owners`, `/rentals/outgoing`, `/rentals/incoming` - Fleet modules
-- `/reports` - Daily unified report with CSV export
+- `/reports` - 15-type report system with CSV export
+- `/notifications` - Real-time business activity notifications
 - `/admin/businesses`, `/admin/owners` - Admin modules
 
 ## Environment Variables
@@ -67,3 +68,21 @@ Wholesale Trading + Fleet & Machinery Rental web platform using React + Vite + T
 - Realistic Rwanda-context dummy data (Kinyarwanda item names, Rwandan suppliers/customers/locations)
 - Subtle UI animations: page transitions (animate-page-fade), table row stagger (animate-row-slide), button hover scale effects
 - CSS animations defined in index.css: landing-fade-up, landing-blob-1/2/3, page-fade-in, row-slide-in
+
+## Phase 3 Features (Completed)
+- **15-Type Report System**: Daily, Monthly, Custom Date Range, Purchase, Sales, Profit, Outstanding Payables, Outstanding Receivables, Stock Summary, Supplier Ledger, Customer Ledger, Rental Outgoing, Rental Incoming, Vehicle Utilization, Rental Profit
+- **Dynamic Report Filters**: Report type selector, date pickers (daily/monthly/custom range), optional supplier/customer filters, required supplier/customer for ledger reports
+- **CSV Export**: All report types exportable with proper file naming (e.g., UMUGWANEZA_LTD_Daily_Report_2026-02-24.csv)
+- **Payments Tabbed UI**: Grocery Payments tab + Rental Payments tab with full CRUD for both
+- **Rental Payments**: Record payments against pending rental contracts, list with vehicle/direction info
+- **Notifications Page**: Real-time business activity feed (purchases, sales, payments, rentals, vehicle alerts, overdue items)
+- **Notification Bell**: Header bell icon with badge count, links to /notifications, auto-refreshes every 30s
+- **14+ New API Endpoints**: All report types, rental payments listing, pending contracts, notifications
+- **Server-side report helpers**: buildUnifiedRows() and computeSummary() for shared report logic
+- **Full i18n Coverage**: All new UI strings translated in both EN and RW (en.json, rw.json)
+
+## Key Components (Phase 3)
+- `client/src/pages/reports.tsx` - 15-type report page with dynamic columns, filters, CSV export
+- `client/src/pages/payments.tsx` - Tabbed payments (Grocery + Rental) with dialogs
+- `client/src/pages/notifications.tsx` - Notification feed with icons and timestamps
+- `client/src/components/notification-bell.tsx` - Header bell icon with unread badge count

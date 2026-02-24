@@ -1,0 +1,620 @@
+🌍 UMUGWANEZA LTD
+
+Wholesale Trading + Fleet & Machinery Rental
+Owner-Focused Financial & Reporting Web Platform
+
+This document is:
+
+✔ Clear for beginner developer
+✔ Structured for High-Level Design (HLD)
+✔ Detailed for Low-Level Design (LLD)
+✔ Production-ready
+✔ Financially accurate
+✔ Audit-friendly
+✔ Suitable for Rwanda wholesale market
+
+📘 1. PRODUCT OVERVIEW
+1.1 Product Name
+
+UMUGWANEZA LTD
+
+1.2 Product Type
+
+Web-based B2B Wholesale Trading + Fleet Rental Management System.
+
+1.3 Target Users
+
+Wholesale traders and fleet owners in Rwanda who:
+
+Buy groceries from factories
+
+Sell groceries to downstream vendors
+
+Rent trucks and machines
+
+Take trucks/machines on rent
+
+Work with partial payments
+
+Need clean financial tracking
+
+1.4 Core Goals
+
+The system must be:
+
+✔ Auditable
+✔ Financially accurate
+✔ Owner-focused
+✔ African-market practical
+✔ Clean and professional
+✔ Scalable
+
+🏗 2. HIGH LEVEL DESIGN (HLD)
+2.1 Architecture Overview
+
+Frontend:
+
+Responsive web UI
+
+Clean professional design
+
+Owner dashboard-centric
+
+Backend:
+
+API-based architecture
+
+Business isolation middleware
+
+Server-side financial calculations
+
+Database:
+
+Multi-tenant
+
+All records linked to business_id
+
+Security:
+
+Owner role only inside business
+
+System Admin (platform level only)
+
+Row Level Security (RLS)
+
+2.2 Core Modules
+Shared Core
+
+Authentication Module
+
+Business Isolation Layer
+
+Payment Engine
+
+Reporting Engine
+
+CSV Export Engine
+
+Audit Logging System
+
+Grocery Module
+
+Items Module
+
+Suppliers Module
+
+Customers Module
+
+Purchases Module
+
+Sales Module
+
+Stock Engine
+
+Profit Engine
+
+Rental Module
+
+Vehicle Master
+
+Rental Customers
+
+External Asset Owners
+
+Outgoing Rental Module
+
+Incoming Rental Module
+
+Availability Engine
+
+Overlap Prevention Engine
+
+Location Tracking
+
+Fleet Profit Engine
+
+🔐 3. ROLE STRUCTURE
+3.1 System Admin
+
+Creates business + owner
+
+Cannot access business financial data
+
+3.2 Owner
+
+Full operational and financial control over:
+
+Grocery trading
+
+Fleet rentals
+
+Payments
+
+Reports
+
+Dashboard
+
+No internal admin role.
+
+🥬 4. GROCERY MODULE – LOW LEVEL DESIGN
+4.1 Items
+
+Fields:
+
+item_name
+
+measurement_type (WEIGHT / VOLUME)
+
+If WEIGHT → stored internally in KG
+If VOLUME → stored internally in Litres
+
+Display:
+If ≥ 100kg → preview quintals
+If ≥ 1000kg → preview tons
+
+4.2 Purchases (Stock In)
+
+Owner records:
+
+Supplier
+
+Item
+
+Quantity
+
+Unit price
+
+Total cost
+
+Date
+
+Stock increases immediately.
+
+Financial Status:
+
+PENDING
+
+PARTIAL
+
+FULLY_SETTLED
+
+4.3 Sales (Stock Out)
+
+Owner records:
+
+Customer
+
+Item
+
+Quantity
+
+Unit price
+
+Total sale
+
+Date
+
+Stock validation required.
+
+Stock reduces immediately.
+
+Financial Status:
+
+PENDING
+
+PARTIAL
+
+FULLY_RECEIVED
+
+4.4 Grocery Payment Engine
+
+Payments stored separately.
+
+Rules:
+
+Payment cannot exceed total
+
+Remaining = Total − Paid
+
+Status auto-updates
+
+Profit = Total Sales − Total Purchases
+Payment status does NOT affect profit.
+
+🚛 5. RENTAL MODULE – LOW LEVEL DESIGN
+5.1 Vehicle Master
+
+Fields:
+
+vehicle_id
+
+vehicle_name
+
+vehicle_type (Truck / Machine)
+
+rental_type (DAY / HOUR)
+
+ownership_type (OWN / EXTERNAL)
+
+base_rate
+
+current_status
+
+current_location
+
+Statuses:
+
+AVAILABLE
+
+RENTED_OUT
+
+RENTED_IN
+
+MAINTENANCE
+
+OFFLINE
+
+5.2 Outgoing Rental (You Rent Out)
+
+Fields:
+
+Customer
+
+Vehicle
+
+Start date/time
+
+End date/time
+
+Rate
+
+Total
+
+Location
+
+Calculation:
+Truck → Days × Rate
+Machine → Hours × Rate
+
+Financial Status:
+
+PENDING
+
+PARTIAL
+
+FULLY_SETTLED
+
+Operational Status:
+
+ACTIVE
+
+COMPLETED
+
+CANCELLED
+
+Vehicle status auto-updates.
+
+5.3 Incoming Rental (You Rent From Others)
+
+Fields:
+
+External Owner
+
+Vehicle
+
+Start/End
+
+Rate
+
+Total cost
+
+Financial Status:
+
+PENDING
+
+PARTIAL
+
+FULLY_SETTLED
+
+This appears in Outstanding Payables.
+
+🚫 6. OVERLAP PREVENTION ENGINE (CRITICAL)
+
+Before creating rental:
+
+Check:
+
+existing_start < new_end
+AND
+existing_end > new_start
+AND
+status IN ('ACTIVE','MAINTENANCE')
+
+If true → Block rental.
+
+Backend validation mandatory.
+
+Index required on:
+vehicle_id
+start_datetime
+end_datetime
+
+📍 7. LOCATION TRACKING
+
+Each vehicle has:
+
+current_location
+
+Updates:
+
+When rental starts → location = customer location
+
+When rental ends → location = base yard
+
+Manual override allowed
+
+📊 8. DASHBOARD (UNIFIED)
+
+Dashboard must show:
+
+Grocery Section
+
+Total Stock
+
+Today Sales
+
+Monthly Sales
+
+Monthly Profit
+
+Outstanding Payables
+
+Outstanding Receivables
+
+Rental Section
+
+Total Vehicles
+
+Available Vehicles
+
+Rented Out
+
+Rented In
+
+Maintenance
+
+Today Rental Revenue
+
+Monthly Rental Revenue
+
+Rental Outstanding Payables
+
+Rental Outstanding Receivables
+
+📊 9. REPORT SYSTEM – COMPLETE DESIGN
+
+All reports live under:
+
+📊 Reports Page
+
+Filters:
+
+Report Type
+
+Date Filter
+
+From Date
+
+To Date
+
+Item (optional)
+
+Supplier (optional)
+
+Customer (optional)
+
+Vehicle (optional)
+
+Generate
+
+Download CSV
+
+All queries must include:
+
+WHERE business_id = current_user.business_id
+
+🗂 9.1 REPORT TYPES (FINAL)
+Grocery Reports
+
+Daily Report
+
+Monthly Report
+
+Custom Date Range Report
+
+Purchase Report
+
+Sales Report
+
+Profit Report
+
+Outstanding Payables
+
+Outstanding Receivables
+
+Stock Summary
+
+Supplier Ledger
+
+Customer Ledger
+
+Rental Reports
+
+Rental Outgoing Report
+
+Rental Incoming Report
+
+Vehicle Utilization Report
+
+Rental Profit Report
+
+📅 9.2 DAILY REPORT (Unified)
+
+Shows:
+Purchases + Sales + Rentals
+
+Columns:
+Date
+Type (Purchase / Sale / Rental Out / Rental In)
+Reference
+Party
+Item/Vehicle
+Quantity
+Total
+Paid
+Remaining
+Status
+
+Summary Row:
+Total Purchases
+Total Sales
+Total Rental Revenue
+Total Rental Cost
+Net Profit
+
+📆 9.3 MONTHLY & CUSTOM REPORTS
+
+Filter:
+Month OR From-To
+
+Query:
+WHERE transaction_date BETWEEN from_date AND to_date
+AND business_id = current_user.business_id
+
+Server-side aggregation mandatory.
+
+📘 9.4 LEDGER REPORTS
+
+Supplier Ledger
+Customer Ledger
+Rental Owner Ledger
+
+Running Balance:
+Balance(n) = Balance(n-1) + Debit − Credit
+
+Final row:
+Outstanding Balance
+
+📦 9.5 STOCK SUMMARY REPORT
+
+Item
+Total Purchased
+Total Sold
+Current Stock
+Unit
+
+Weight → KG + preview
+Volume → Litres
+
+📥 10. CSV EXPORT ENGINE
+
+File Format:
+
+UMUGWANEZA_LTD_ReportType_YYYY-MM-DD.csv
+
+Structure:
+Header
+Data rows
+Final TOTAL row
+
+Currency format:
+Column name includes (RWF)
+Cells contain numeric values only.
+
+Generated server-side.
+
+🔐 11. SECURITY REQUIREMENTS
+
+All queries must filter by business_id
+
+Overlap validation backend only
+
+No cross-business visibility
+
+No frontend-only calculations
+
+Audit log for:
+
+Rental creation
+
+Purchase creation
+
+Payment entries
+
+Override actions
+
+⚙ 12. PRODUCTION READY BEHAVIOR
+
+✔ Pagination for large reports
+✔ Indexed queries
+✔ Proper error handling
+✔ Backend validation for:
+
+Stock availability
+
+Payment overflow
+
+Overlapping rentals
+✔ All financial summaries server-calculated
+
+🏁 FINAL PRODUCTION SUMMARY
+
+UMUGWANEZA LTD now includes:
+
+✔ Wholesale Inventory System
+✔ Fleet Rental System
+✔ Partial Payment Engine
+✔ Settlement Tracking
+✔ Unified Financial Reporting
+✔ Overlap-Protected Booking
+✔ Real-time Vehicle Availability
+✔ Location Tracking
+✔ Multi-unit Support
+✔ CSV Export
+✔ Secure Multi-Tenant Architecture
+✔ Owner-Controlled System
+✔ Audit Logging
+✔ Rwanda Franc Support
+
+🚀 FINAL CONCLUSION
+
+UMUGWANEZA LTD is now:
+
+A Complete Business Operating System
+For Grocery Trading + Fleet Rental
+
+Production-grade.
+Financially auditable.
+Scalable.
+Practical for Rwanda market.
+Clean and professional.

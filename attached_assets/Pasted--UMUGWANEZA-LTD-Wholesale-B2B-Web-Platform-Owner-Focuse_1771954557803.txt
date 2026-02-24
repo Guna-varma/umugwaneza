@@ -1,0 +1,1809 @@
+🌍 UMUGWANEZA LTD
+Wholesale B2B Web Platform
+Owner-Focused Financial & Reporting System
+This document is written:
+✔ Clear enough for a beginner web developer
+✔ Structured for High-Level Design (HLD)
+✔ Detailed for Low-Level Design (LLD)
+✔ Production-ready
+✔ Financially accurate
+✔ Audit-friendly
+✔ Suitable for Rwanda wholesale market
+________________________________________
+📘 1. PRODUCT OVERVIEW
+1.1 Product Name
+UMUGWANEZA LTD
+1.2 Product Type
+Web-based B2B Wholesale Inventory and Financial Reporting System.
+1.3 Target Users
+Wholesale traders in Rwanda who:
+•	Buy goods from factories
+•	Sell goods to downstream vendors
+•	Work with partial payments
+•	Need clean financial tracking
+1.4 Core Goals
+The system must be:
+✔ Auditable
+✔ Financially accurate
+✔ Owner-focused
+✔ African-market practical
+✔ Clean and professional
+________________________________________
+🏗 2. HIGH LEVEL DESIGN (HLD)
+2.1 Architecture Overview
+Frontend:
+•	Web-based UI (Responsive)
+•	Clean professional interface
+Backend:
+•	API-based architecture
+•	Secure business isolation
+Database:
+•	Multi-tenant
+•	Each record linked to business_id
+Security:
+•	Only Owner role inside business
+•	System Admin (platform-level only)
+•	Row Level Security (RLS)
+________________________________________
+2.2 Core Modules
+1.	Authentication Module
+2.	Items Module
+3.	Suppliers Module
+4.	Customers Module
+5.	Purchases Module
+6.	Sales Module
+7.	Payments Module
+8.	Stock Engine
+9.	Profit Engine
+10.	Reports Module
+11.	CSV Export Engine
+________________________________________
+🔐 3. ROLE STRUCTURE
+3.1 System Admin
+•	Creates business + owner
+•	Cannot view business financial data
+3.2 Owner
+•	Full operational and financial control
+•	Only role inside business
+________________________________________
+📊 4. REPORT SYSTEM – COMPLETE DESIGN
+All reports live under:
+📊 Reports Page
+________________________________________
+🧭 4.1 REPORT PAGE LAYOUT (UI SPECIFICATION)
+Top Filter Section:
+Report Type: [Dropdown]
+Date Filter: [Daily / Monthly / Custom]
+From Date: [Date Picker]
+To Date: [Date Picker]
+Item Filter (Optional)
+Supplier Filter (Optional)
+Customer Filter (Optional)
+Buttons:
+[Generate Report]
+[Download CSV]
+Below:
+Data Table
+Last Row:
+Highlighted Summary Row
+________________________________________
+🗂 4.2 REPORT TYPES (FINAL LIST)
+1.	Daily Report
+2.	Monthly Report
+3.	Custom Date Range Report
+4.	Purchase Report
+5.	Sales Report
+6.	Profit Report
+7.	Outstanding Payables Report
+8.	Outstanding Receivables Report
+9.	Stock Summary Report
+10.	Supplier Ledger
+11.	Customer Ledger
+________________________________________
+📅 5. REPORT SPECIFICATIONS (LOW LEVEL DESIGN)
+________________________________________
+5.1 DAILY REPORT
+Filter:
+Date = selected date
+Data Source:
+Purchases + Sales
+Query Logic:
+WHERE transaction_date = selected_date
+AND business_id = current_user.business_id
+Table Columns:
+Date
+Type (Purchase / Sale)
+Reference No
+Party Name
+Item
+Quantity
+Unit
+Unit Price
+Total Amount (RWF)
+Amount Paid / Received
+Remaining Amount
+Status
+________________________________________
+Summary Row Logic
+Compute:
+Total Purchases = SUM(total_purchase_cost)
+Total Sales = SUM(total_sale_amount)
+Total Paid = SUM(amount_paid)
+Total Received = SUM(amount_received)
+Outstanding Payables = SUM(purchase_remaining)
+Outstanding Receivables = SUM(sale_remaining)
+Net Profit = Total Sales - Total Purchases
+UI:
+Bold
+Light grey background
+Label: TOTAL
+________________________________________
+5.2 MONTHLY REPORT
+Filter:
+Month + Year
+Query Logic:
+WHERE MONTH(transaction_date) = selected_month
+AND YEAR(transaction_date) = selected_year
+AND business_id = current_user.business_id
+Table structure same as Daily.
+Summary same calculation logic.
+Purpose:
+Owner monthly financial overview.
+________________________________________
+5.3 CUSTOM DATE RANGE REPORT
+Filter:
+From Date
+To Date
+Query:
+WHERE transaction_date BETWEEN from_date AND to_date
+AND business_id = current_user.business_id
+Summary Calculations:
+SUM(total_purchase_cost)
+SUM(total_sale_amount)
+SUM(amount_paid)
+SUM(amount_received)
+SUM(remaining_amount)
+Profit = Sales - Purchases
+This is the most important production report.
+________________________________________
+5.4 PURCHASE REPORT
+Filter:
+Date Range
+Supplier (optional)
+Columns:
+Date
+Supplier
+Item
+Quantity
+Unit
+Unit Price
+Total Cost (RWF)
+Paid
+Remaining
+Status
+Summary:
+Total Purchased Amount
+Total Paid
+Total Outstanding
+________________________________________
+5.5 SALES REPORT
+Filter:
+Date Range
+Customer (optional)
+Columns:
+Date
+Customer
+Item
+Quantity
+Unit
+Unit Price
+Total Sale (RWF)
+Received
+Remaining
+Status
+Summary:
+Total Sales
+Total Received
+Total Outstanding
+Net Profit
+________________________________________
+5.6 PROFIT REPORT
+Purpose:
+Revenue vs Cost only.
+Filter:
+Daily
+Monthly
+Custom Range
+Columns:
+Date
+Total Sales
+Total Purchases
+Profit
+Important Rule:
+Profit = Sales - Purchases
+Payment status does NOT affect profit.
+Summary:
+Grand Total Sales
+Grand Total Purchases
+Net Profit
+________________________________________
+5.7 OUTSTANDING PAYABLES REPORT
+Shows:
+All purchases not fully settled.
+Filter:
+Date Range
+Supplier (optional)
+Columns:
+Purchase Date
+Supplier
+Item
+Total Cost
+Paid
+Remaining
+Status
+Summary:
+Total Outstanding Payables
+________________________________________
+5.8 OUTSTANDING RECEIVABLES REPORT
+Shows:
+All sales not fully received.
+Filter:
+Date Range
+Customer (optional)
+Columns:
+Sale Date
+Customer
+Item
+Total Sale
+Received
+Remaining
+Status
+Summary:
+Total Outstanding Receivables
+________________________________________
+5.9 STOCK SUMMARY REPORT
+Purpose:
+Inventory control.
+Columns:
+Item
+Total Purchased
+Total Sold
+Current Stock
+Unit
+Display Rules:
+If Weight:
+Primary = KG
+Preview = Quintals and Tons
+If Volume:
+Primary = Litres
+Summary:
+(Optional future) Total stock value.
+________________________________________
+5.10 SUPPLIER LEDGER
+Filter:
+Supplier
+Date Range
+Columns:
+Date
+Reference
+Purchase Amount
+Payment Amount
+Running Balance
+Running Balance Logic:
+Balance(n) = Balance(n-1) + Purchase - Payment
+Final Summary:
+Final Outstanding Balance
+________________________________________
+5.11 CUSTOMER LEDGER
+Same logic as Supplier Ledger.
+Final Row:
+Outstanding Receivable
+________________________________________
+📥 6. CSV EXPORT SPECIFICATION
+File Naming Format:
+UMUGWANEZA_LTD_Daily_Report_2026-02-23.csv
+UMUGWANEZA_LTD_Monthly_Report_Feb_2026.csv
+UMUGWANEZA_LTD_Custom_Report_2026-01-01_to_2026-01-31.csv
+CSV Structure:
+Row 1: Header
+Row 2–N: Data
+Final Row: TOTAL
+Currency Handling:
+Column header example:
+Total Amount (RWF)
+Cells contain only numeric values.
+No currency symbols inside numbers.
+Must open cleanly in Excel.
+________________________________________
+🔐 7. SECURITY REQUIREMENTS
+Every report query MUST include:
+WHERE business_id = current_user.business_id
+No cross-business data allowed.
+Owner-only access.
+No public access.
+________________________________________
+⚙ 8. PRODUCTION READY BEHAVIOR
+✔ Reports must load within acceptable performance time
+✔ Pagination for large data sets
+✔ Proper error handling
+✔ No calculation in frontend only
+✔ All summary calculations verified server-side
+✔ CSV generated server-side
+________________________________________
+🎨 9. UI REQUIREMENTS
+Design Style:
+✔ Clean
+✔ Neutral colors
+✔ Professional
+✔ Easy to read
+✔ No flashy animations
+Summary row:
+Bold
+Light grey background
+Clearly labeled TOTAL
+Filters section fixed at top.
+Mobile responsive.
+________________________________________
+🏆 10. FINAL PRODUCTION ARCHITECTURE SUMMARY
+UMUGWANEZA LTD Reporting System includes:
+✔ Daily Reports
+✔ Monthly Reports
+✔ Custom Date Reports
+✔ Purchase Reports
+✔ Sales Reports
+✔ Profit Reports
+✔ Outstanding Reports
+✔ Ledger Reports
+✔ Stock Reports
+✔ Summary Rows
+✔ CSV Export
+✔ Multi-unit display
+✔ RWF currency
+✔ Secure isolation
+✔ Auditable financial logic
+________________________________________
+🚀 CONCLUSION
+This is not a basic inventory report.
+This is a:
+Structured
+Auditable
+Financial Reporting Engine
+For African Wholesale Trading Businesses
+Production-grade.
+Scalable.
+Clear.
+Owner-focused.
+
+
+
+🧭 1️⃣ REPORT SYSTEM OVERVIEW
+All reports will live under:
+📊 Reports Page
+Top filter section:
+•	Report Type dropdown
+•	Date Filter
+•	From Date
+•	To Date
+•	Item Filter (optional)
+•	Supplier Filter (optional)
+•	Customer Filter (optional)
+•	Generate Button
+•	Download CSV Button
+All reports must be based on:
+business_id
+AND
+date range
+________________________________________
+🗂 2️⃣ REPORT TYPES (FINAL LIST)
+For UMUGWANEZA LTD:
+1.	Daily Report
+2.	Monthly Report
+3.	Custom Date Range Report (From - To)
+4.	Purchase Report
+5.	Sales Report
+6.	Profit Report
+7.	Outstanding Payables Report
+8.	Outstanding Receivables Report
+9.	Stock Summary Report
+10.	Supplier Ledger
+11.	Customer Ledger
+________________________________________
+📅 3️⃣ DAILY REPORT
+Filter:
+Date = selected date
+Shows:
+All Purchases + All Sales for that day
+Table Columns:
+Date
+Type (Purchase / Sale)
+Reference No
+Party Name
+Item
+Quantity
+Unit
+Unit Price
+Total Amount
+Amount Paid / Received
+Remaining Amount
+Status
+________________________________________
+🔻 Summary Row (Last Row)
+Total Purchases
+Total Sales
+Total Paid
+Total Received
+Total Outstanding
+Net Profit (Sales - Purchases)
+Example Summary Row:
+TOTAL:
+Purchases = RWF 2,500,000
+Sales = RWF 3,200,000
+Profit = RWF 700,000
+Outstanding Payables = RWF 1,000,000
+Outstanding Receivables = RWF 400,000
+This summary row must be visually highlighted.
+________________________________________
+📆 4️⃣ MONTHLY REPORT
+Filter:
+Month + Year
+Shows:
+All transactions within that month.
+Same table structure as Daily.
+Summary Row includes:
+Total Purchases
+Total Sales
+Total Profit
+Total Paid
+Total Received
+Total Remaining
+This is Owner’s financial overview.
+________________________________________
+📅 5️⃣ CUSTOM DATE RANGE REPORT
+Filter:
+From Date
+To Date
+This is the most important report.
+Production logic:
+Query must be:
+WHERE transaction_date BETWEEN from_date AND to_date
+AND business_id = current_user.business_id
+Same table layout.
+Summary row must calculate:
+SUM(total_purchase_cost)
+SUM(total_sale_amount)
+SUM(amount_paid)
+SUM(amount_received)
+SUM(remaining_amount)
+Profit = Sales - Purchases
+________________________________________
+🧾 6️⃣ PURCHASE REPORT
+Filter by:
+Date Range
+Supplier
+Table:
+Date
+Supplier
+Item
+Quantity
+Unit
+Unit Price
+Total Cost
+Paid
+Remaining
+Status
+Summary:
+Total Purchased Amount
+Total Paid
+Total Outstanding
+________________________________________
+🧾 7️⃣ SALES REPORT
+Filter by:
+Date Range
+Customer
+Table:
+Date
+Customer
+Item
+Quantity
+Unit
+Unit Price
+Total Sale
+Received
+Remaining
+Status
+Summary:
+Total Sales
+Total Received
+Total Outstanding
+Net Profit
+________________________________________
+📈 8️⃣ PROFIT REPORT
+This report is only about:
+Revenue - Cost
+Filter:
+Daily
+Monthly
+Custom Date Range
+Table:
+Date
+Total Sales
+Total Purchases
+Profit
+Summary Row:
+Grand Total Sales
+Grand Total Purchases
+Net Profit
+Important:
+Profit must not depend on payment settlement.
+________________________________________
+💰 9️⃣ OUTSTANDING PAYABLES REPORT
+Shows:
+All purchases not fully settled.
+Columns:
+Purchase Date
+Supplier
+Item
+Total Cost
+Paid
+Remaining
+Status
+Summary:
+Total Outstanding Payables
+________________________________________
+💵 🔟 OUTSTANDING RECEIVABLES REPORT
+Shows:
+All sales not fully received.
+Columns:
+Sale Date
+Customer
+Item
+Total Sale
+Received
+Remaining
+Status
+Summary:
+Total Outstanding Receivables
+________________________________________
+📦 1️⃣1️⃣ STOCK SUMMARY REPORT
+Shows:
+Item
+Total Purchased
+Total Sold
+Current Stock
+Unit
+If weight:
+Show:
+KG
+(Quintal preview)
+(Ton preview)
+If oil:
+Show Litres only.
+Summary Row:
+Total Stock Value (optional future enhancement)
+________________________________________
+📘 1️⃣2️⃣ SUPPLIER LEDGER
+Shows all purchases + payments per supplier.
+Layout:
+Date
+Reference
+Purchase Amount
+Payment Amount
+Balance
+Running balance must be calculated line by line.
+Final Summary:
+Final Outstanding Balance
+________________________________________
+📗 1️⃣3️⃣ CUSTOMER LEDGER
+Same structure as supplier ledger.
+Final row:
+Outstanding Receivable
+________________________________________
+🎨 UI DESIGN FOR REPORT PAGE
+Top Section:
+________________________________________
+Report Type: [Dropdown]
+From Date: [Date]
+To Date: [Date]
+[Generate]
+[Download CSV]
+Below:
+Clean professional table.
+Last row:
+Bold
+Light grey background
+Clearly labeled TOTAL
+________________________________________
+📥 CSV DOWNLOAD (PRODUCTION STANDARD)
+File Naming Format:
+UMUGWANEZA_LTD_Daily_Report_2026-02-23.csv
+UMUGWANEZA_LTD_Monthly_Report_Feb_2026.csv
+UMUGWANEZA_LTD_Custom_Report_2026-01-01_to_2026-01-31.csv
+CSV must include:
+Header Row
+All data rows
+Final Summary Row
+Open directly in Excel with proper formatting.
+Currency values should not include symbols inside numeric cells.
+Instead:
+Column header:
+Total Amount (RWF)
+So Excel can sum easily.
+________________________________________
+🔐 SECURITY (CRITICAL)
+All reports must:
+Filter by business_id
+No cross-business data
+Owner only
+________________________________________
+🏆 FINAL PRODUCTION REPORT ARCHITECTURE
+For UMUGWANEZA LTD website:
+You now have:
+✔ Daily Reports
+✔ Monthly Reports
+✔ Custom Date Reports
+✔ Purchase Reports
+✔ Sales Reports
+✔ Profit Reports
+✔ Outstanding Reports
+✔ Ledger Reports
+✔ Stock Reports
+✔ Summary Rows
+✔ CSV Export
+✔ Multi-unit display
+✔ RWF currency
+✔ Secure isolation
+________________________________________
+🚀 FINAL NOTE
+This reporting system is:
+Professional
+Financially meaningful
+Scalable
+Suitable for Rwanda wholesale traders
+This is not basic inventory.
+This is structured business intelligence.
+
+
+
+
+
+
+🌍 UMUGWANEZA LTD
+Wholesale Trading + Fleet & Machinery Rental Platform
+This document is your Complete Technical PRD (High Level + Low Level Design)
+Written clearly for a beginner web developer.
+This rental system will:
+✔ Be Owner-controlled
+✔ Work without payment gateway
+✔ Track partial payments
+✔ Track pending payments
+✔ Track asset availability
+✔ Track asset location
+✔ Track asset ownership
+✔ Track inbound & outbound rentals
+✔ Be auditable
+✔ Be financially accurate
+✔ Work for African market realities
+________________________________________
+📘 SECTION 1 — SYSTEM EXPANSION OVERVIEW
+You now have TWO MAJOR MODULES:
+1️⃣ Grocery Wholesale Module
+2️⃣ Fleet & Machinery Rental Module
+Both under same website:
+UMUGWANEZA LTD
+Both share:
+•	Same Owner
+•	Same business_id isolation
+•	Same reporting logic
+•	Same partial payment tracking
+•	Same settlement logic
+________________________________________
+📦 SECTION 2 — RENTAL MODULE OVERVIEW
+This module manages:
+•	Trucks (Daily rental)
+•	Machines (Hourly rental)
+•	Own vehicles
+•	Third-party rented vehicles
+•	Partial payments
+•	Pending payments
+•	Asset availability
+•	Location tracking
+No payment gateway.
+Only manual payment logging.
+________________________________________
+🏗 HIGH LEVEL DESIGN (HLD)
+Rental Module Contains:
+1.	Vehicle Master
+2.	Rental Customers
+3.	External Asset Owners
+4.	Outgoing Rental Flow (You rent your assets to others)
+5.	Incoming Rental Flow (You rent assets from others)
+6.	Payment Logging
+7.	Availability Engine
+8.	Location Tracking
+9.	Rental Reports
+10.	Dashboard Integration
+________________________________________
+🚛 SECTION 3 — VEHICLE MASTER
+Owner has:
+30 Trucks
+50 Machines
+Total: 80 assets
+Each asset must be uniquely identifiable.
+________________________________________
+3.1 Vehicle Table Structure (Conceptual)
+Fields:
+•	vehicle_id
+•	vehicle_name
+•	vehicle_type (Truck / Machine)
+•	rental_type (Per Day / Per Hour)
+•	ownership_type (Own / Rented From Others)
+•	owner_name (if external)
+•	registration_number
+•	capacity
+•	base_rate
+•	current_status
+•	current_location
+•	notes
+________________________________________
+3.2 VEHICLE STATUS MODEL
+Each vehicle can be:
+•	AVAILABLE
+•	RENTED_OUT
+•	RENTED_IN
+•	MAINTENANCE
+•	OFFLINE
+Status updates automatically based on rental contracts.
+________________________________________
+🟢 SECTION 4 — OUTGOING RENTAL FLOW (You Rent Your Vehicles)
+This is when:
+You give your truck or machine to someone.
+________________________________________
+SCREEN: Create Rental Contract (Outgoing)
+Fields:
+•	Customer Name
+•	Customer Phone
+•	Customer Address
+•	Vehicle
+•	Rental Type (Auto from vehicle)
+•	Start Date
+•	End Date (for trucks)
+•	Start Time / End Time (for machines)
+•	Rate
+•	Total Amount (Auto calculated)
+•	Location
+•	Notes
+System calculates:
+If Truck:
+Total = Days × Per Day Rate
+If Machine:
+Total = Hours × Per Hour Rate
+________________________________________
+RENTAL FINANCIAL STATUS
+When rental created:
+Financial Status:
+•	PENDING
+•	PARTIALLY_PAID
+•	FULLY_SETTLED
+Operational Status:
+•	ACTIVE
+•	COMPLETED
+•	CANCELLED
+________________________________________
+Payment Flow (Outgoing Rental)
+Owner records payment manually.
+Fields:
+•	Amount
+•	Date
+•	Mode
+•	Notes
+System recalculates:
+Remaining
+Status
+When remaining = 0 → FULLY_SETTLED
+________________________________________
+Availability Logic
+When rental starts:
+Vehicle status → RENTED_OUT
+When rental ends:
+Vehicle status → AVAILABLE
+________________________________________
+🔴 SECTION 5 — INCOMING RENTAL FLOW (You Rent From Others)
+This is when:
+You rent a truck/machine from external owner.
+________________________________________
+SCREEN: Create Incoming Rental Contract
+Fields:
+•	External Owner Name
+•	Phone
+•	Vehicle Details
+•	Rental Type
+•	Start Date
+•	End Date
+•	Rate
+•	Total Cost
+•	Location
+•	Notes
+Financial Status:
+•	PENDING
+•	PARTIALLY_PAID
+•	FULLY_SETTLED
+________________________________________
+Payment Flow (Incoming Rental)
+Owner logs payment made.
+System tracks:
+Total Paid
+Remaining
+Outstanding
+This appears in:
+Outstanding Payables Report.
+________________________________________
+📍 SECTION 6 — LOCATION TRACKING
+Each vehicle must have:
+Current Location Field
+When rental created:
+Location updated.
+When returned:
+Location reset to base.
+Owner can manually update location if needed.
+________________________________________
+📊 SECTION 7 — RENTAL DASHBOARD
+Dashboard must show:
+Total Vehicles: 80
+Available Vehicles
+Rented Out Vehicles
+Rented In Vehicles
+Under Maintenance
+Financial Section:
+Outstanding Receivables (Rental)
+Outstanding Payables (Rental)
+Today Rental Revenue
+Monthly Rental Revenue
+________________________________________
+📑 SECTION 8 — RENTAL REPORTS
+All reports filtered by:
+business_id
+date range
+________________________________________
+8.1 Rental Outgoing Report
+Columns:
+Customer
+Vehicle
+Rental Period
+Total Amount
+Paid
+Remaining
+Status
+Summary:
+Total Revenue
+Total Received
+Total Outstanding
+________________________________________
+8.2 Rental Incoming Report
+Columns:
+External Owner
+Vehicle
+Rental Period
+Total Cost
+Paid
+Remaining
+Status
+Summary:
+Total Cost
+Total Paid
+Total Outstanding
+________________________________________
+8.3 Vehicle Utilization Report
+Shows:
+Vehicle
+Total Rental Days/Hours
+Total Revenue Generated
+Availability %
+Helps strategic planning.
+________________________________________
+8.4 Rental Profit Report
+Profit =
+Outgoing Rental Revenue
+minus
+Incoming Rental Costs
+This shows:
+Net Fleet Profit.
+________________________________________
+📥 SECTION 9 — CSV EXPORT
+File Format:
+UMUGWANEZA_LTD_Rental_Report_YYYY-MM-DD.csv
+Must include:
+Header
+All rows
+Summary row
+Numeric columns contain numbers only.
+________________________________________
+🔄 SECTION 10 — EDGE CASE SCENARIOS
+1.	Vehicle returned late
+→ Extra hours/days calculated
+2.	Partial payment before rental
+→ Status = PARTIAL
+3.	Payment after return
+→ Allowed
+4.	Owner rents vehicle offline to another
+→ Manual rental entry allowed
+5.	Vehicle rented in and rented out
+→ Allowed only if not overlapping dates
+System must prevent overlapping bookings.
+________________________________________
+🔐 SECTION 11 — SECURITY
+All rental data linked to:
+business_id
+Owner only.
+No cross-business visibility.
+________________________________________
+📊 SECTION 12 — INTEGRATION WITH GROCERY SYSTEM
+Rental and Grocery share:
+•	Payment logic
+•	Settlement logic
+•	Reports framework
+•	Dashboard
+But maintain separate modules.
+________________________________________
+🏁 FINAL PRODUCTION SUMMARY
+UMUGWANEZA LTD now includes:
+✔ Wholesale Inventory Module
+✔ Partial Payment Engine
+✔ Settlement Tracking
+✔ Rental Outgoing Module
+✔ Rental Incoming Module
+✔ Vehicle Availability Engine
+✔ Location Tracking
+✔ Rental Profit Tracking
+✔ Ledger Reports
+✔ CSV Export
+✔ Owner-Controlled System
+✔ Multi-tenant Security
+✔ African Market Practical Design
+________________________________________
+This is now a:
+Commodity Trading + Fleet Rental
+Business Operating System
+Production-ready.
+Scalable.
+Financially auditable.
+
+
+🚫 Overlapping Booking Prevention Logic
+For UMUGWANEZA LTD Rental System
+Production-Ready + Clear for Beginner Developer
+This is CRITICAL.
+If not designed properly:
+•	Same truck may be double-booked
+•	Revenue calculations become wrong
+•	Owner loses control
+•	System becomes unreliable
+Now let’s design this properly.
+________________________________________
+🧠 1️⃣ WHAT IS OVERLAPPING?
+Overlapping means:
+One vehicle is booked for two rentals at the same time.
+Example:
+Truck A rented:
+1 Jan to 5 Jan
+Another rental tries:
+4 Jan to 7 Jan
+This overlaps (4th & 5th).
+This must be blocked.
+________________________________________
+🏗 2️⃣ HIGH LEVEL DESIGN
+Every rental contract must include:
+•	vehicle_id
+•	rental_start_datetime
+•	rental_end_datetime
+•	operational_status
+Only ACTIVE rentals block availability.
+Completed or Cancelled rentals do NOT block.
+________________________________________
+⚙ 3️⃣ GENERAL OVERLAP RULE
+New rental CANNOT be created if:
+There exists another rental for same vehicle
+Where:
+existing_start < new_end
+AND
+existing_end > new_start
+AND
+status = ACTIVE
+This is the universal time overlap formula.
+________________________________________
+📐 4️⃣ MATHEMATICAL LOGIC EXPLAINED (Feynman Style)
+Imagine timeline:
+Existing booking:
+|------A------|
+New booking:
+|----B----|
+If B touches inside A → Block.
+If B starts after A ends → Allow.
+If B ends before A starts → Allow.
+________________________________________
+💻 5️⃣ SQL LEVEL LOGIC (LOW LEVEL DESIGN)
+When creating new rental:
+System must check:
+SELECT 1
+FROM rentals
+WHERE vehicle_id = :vehicle_id
+AND operational_status = 'ACTIVE'
+AND (
+      existing_start_datetime < :new_end_datetime
+  AND existing_end_datetime > :new_start_datetime
+)
+LIMIT 1;
+If result exists:
+❌ Reject booking
+If no rows returned:
+✅ Allow booking
+________________________________________
+🚛 6️⃣ TRUCK LOGIC (PER DAY RENTAL)
+Trucks are daily based.
+Store internally:
+start_datetime = 2026-01-01 00:00:00
+end_datetime = 2026-01-05 23:59:59
+Even if user selects dates only.
+This ensures clean overlap logic.
+________________________________________
+🏗 7️⃣ MACHINE LOGIC (PER HOUR RENTAL)
+Machines are hourly based.
+Store:
+start_datetime = exact timestamp
+end_datetime = exact timestamp
+Example:
+Start: 10:00
+End: 18:00
+Overlap rule remains same.
+________________________________________
+🔄 8️⃣ STATUS-BASED BLOCKING
+Only block if:
+operational_status = ACTIVE
+Do NOT block if:
+•	COMPLETED
+•	CANCELLED
+•	MAINTENANCE
+But MAINTENANCE may also block depending on business rule.
+Recommended:
+Maintenance should block rental.
+So blocking statuses:
+•	ACTIVE
+•	MAINTENANCE
+________________________________________
+📍 9️⃣ VEHICLE STATUS AUTO UPDATE
+When rental created:
+Vehicle.status = RENTED_OUT
+When rental completed:
+Vehicle.status = AVAILABLE
+When maintenance created:
+Vehicle.status = MAINTENANCE
+System must auto-sync status with rental lifecycle.
+________________________________________
+⚠ 1️⃣0️⃣ EDGE CASES TO HANDLE
+Case 1: Back-to-Back Booking
+Existing:
+1 Jan – 5 Jan
+New:
+6 Jan – 10 Jan
+Allowed.
+Because:
+existing_end < new_start
+________________________________________
+Case 2: Same Day Return and New Rental
+Truck ends at:
+5 Jan 10:00
+New rental:
+5 Jan 12:00
+Allowed.
+But if:
+5 Jan 08:00 → Block.
+________________________________________
+Case 3: Owner Overrides
+You may want:
+Admin Override Flag.
+If override = TRUE:
+Allow booking even if overlapping.
+But log warning:
+"Manual override used"
+For audit.
+________________________________________
+📊 1️⃣1️⃣ DASHBOARD IMPACT
+Vehicle Count:
+AVAILABLE = vehicles not in ACTIVE rental
+RENTED_OUT = vehicles in ACTIVE rental
+RENTED_IN = external rentals
+MAINTENANCE = under repair
+Availability must be real-time.
+________________________________________
+🔐 1️⃣2️⃣ SECURITY
+Overlap check must happen:
+Backend side ONLY.
+Never rely only on frontend validation.
+Otherwise:
+Two users could book at same time.
+________________________________________
+⚡ 1️⃣3️⃣ PERFORMANCE OPTIMIZATION
+Add index on:
+vehicle_id
+start_datetime
+end_datetime
+operational_status
+This makes overlap query fast.
+________________________________________
+🏁 FINAL PRODUCTION RULE SUMMARY
+Before creating rental:
+1.	Validate start < end
+2.	Validate vehicle exists
+3.	Check overlap query
+4.	If overlap → Reject
+5.	If no overlap → Create rental
+6.	Set vehicle status
+7.	Log action
+________________________________________
+🎯 FINAL RESULT
+Your system now guarantees:
+✔ No double booking
+✔ Accurate availability
+✔ Clean financial logs
+✔ Proper asset utilization
+✔ Audit-safe booking
+✔ Real-world practical behavior
+________________________________________
+This makes UMUGWANEZA LTD rental system:
+Professional fleet management grade.
+
+
+
+
+
+
+
+
+Data base Schema:
+
+
+🌍 UMUGWANEZA LTD
+Wholesale Trading + Fleet Rental
+Multi-Tenant | Auditable | Financially Accurate | Production-Ready
+This schema is:
+✔ Fully normalized
+✔ Multi-tenant safe
+✔ Overlap-safe
+✔ Audit-ready
+✔ Payment-engine unified
+✔ Grocery + Rental combined
+✔ Designed for PostgreSQL (recommended)
+________________________________________
+🧱 CORE PRINCIPLES
+1.	Every table includes:
+o	id (UUID PK)
+o	business_id (UUID FK)
+o	created_at
+o	updated_at
+2.	All financial totals are stored for historical accuracy.
+3.	Payments are stored separately (never overwrite totals).
+4.	No manual stock column. Stock is derived.
+5.	Rental overlap prevention supported by indexed datetime fields.
+________________________________________
+=====================================
+1️⃣ BUSINESS & AUTH STRUCTURE
+=====================================
+1.1 businesses
+id UUID PK
+name TEXT NOT NULL
+currency TEXT DEFAULT 'RWF'
+created_at TIMESTAMP
+updated_at TIMESTAMP
+________________________________________
+1.2 users (Owner only inside business)
+id UUID PK
+business_id UUID FK -> businesses(id)
+email TEXT UNIQUE NOT NULL
+full_name TEXT
+role TEXT CHECK (role IN ('OWNER'))
+is_active BOOLEAN DEFAULT TRUE
+created_at TIMESTAMP
+updated_at TIMESTAMP
+System Admin users stored separately at platform level (not business-linked).
+________________________________________
+=====================================
+2️⃣ GROCERY MODULE TABLES
+=====================================
+2.1 items
+id UUID PK
+business_id UUID FK
+item_name TEXT NOT NULL
+measurement_type TEXT CHECK (measurement_type IN ('WEIGHT','VOLUME'))
+base_unit TEXT CHECK (base_unit IN ('KG','LITRE'))
+is_active BOOLEAN DEFAULT TRUE
+created_at TIMESTAMP
+updated_at TIMESTAMP
+________________________________________
+2.2 suppliers
+id UUID PK
+business_id UUID FK
+supplier_name TEXT NOT NULL
+phone TEXT
+address TEXT
+notes TEXT
+created_at TIMESTAMP
+updated_at TIMESTAMP
+________________________________________
+2.3 customers
+id UUID PK
+business_id UUID FK
+customer_name TEXT NOT NULL
+phone TEXT
+address TEXT
+notes TEXT
+created_at TIMESTAMP
+updated_at TIMESTAMP
+________________________________________
+2.4 purchases (Stock In)
+id UUID PK
+business_id UUID FK
+supplier_id UUID FK
+reference_no TEXT
+purchase_date DATE NOT NULL
+
+total_quantity NUMERIC(15,2) NOT NULL
+unit TEXT
+unit_price NUMERIC(15,2) NOT NULL
+total_purchase_cost NUMERIC(15,2) NOT NULL
+
+amount_paid NUMERIC(15,2) DEFAULT 0
+remaining_amount NUMERIC(15,2)
+
+financial_status TEXT CHECK (
+ financial_status IN ('PENDING','PARTIAL','FULLY_SETTLED')
+)
+
+created_at TIMESTAMP
+updated_at TIMESTAMP
+Index:
+INDEX (business_id, purchase_date)
+________________________________________
+2.5 sales (Stock Out)
+id UUID PK
+business_id UUID FK
+customer_id UUID FK
+reference_no TEXT
+sale_date DATE NOT NULL
+
+total_quantity NUMERIC(15,2) NOT NULL
+unit TEXT
+unit_price NUMERIC(15,2) NOT NULL
+total_sale_amount NUMERIC(15,2) NOT NULL
+
+amount_received NUMERIC(15,2) DEFAULT 0
+remaining_amount NUMERIC(15,2)
+
+financial_status TEXT CHECK (
+ financial_status IN ('PENDING','PARTIAL','FULLY_RECEIVED')
+)
+
+created_at TIMESTAMP
+updated_at TIMESTAMP
+Index:
+INDEX (business_id, sale_date)
+________________________________________
+2.6 grocery_payments
+id UUID PK
+business_id UUID FK
+reference_type TEXT CHECK (reference_type IN ('PURCHASE','SALE'))
+reference_id UUID NOT NULL
+amount NUMERIC(15,2) NOT NULL
+payment_date DATE NOT NULL
+mode TEXT
+notes TEXT
+created_at TIMESTAMP
+________________________________________
+=====================================
+3️⃣ STOCK ENGINE (DERIVED VIEW)
+=====================================
+No stock table.
+Create VIEW:
+stock_summary AS
+SELECT
+item_id,
+SUM(purchases.total_quantity) -
+SUM(sales.total_quantity) AS current_stock
+Filtered by business_id.
+________________________________________
+=====================================
+4️⃣ RENTAL MODULE TABLES
+=====================================
+4.1 vehicles
+id UUID PK
+business_id UUID FK
+vehicle_name TEXT NOT NULL
+vehicle_type TEXT CHECK (vehicle_type IN ('TRUCK','MACHINE'))
+rental_type TEXT CHECK (rental_type IN ('DAY','HOUR'))
+ownership_type TEXT CHECK (ownership_type IN ('OWN','EXTERNAL'))
+registration_number TEXT
+capacity TEXT
+base_rate NUMERIC(15,2)
+current_status TEXT CHECK (
+ current_status IN ('AVAILABLE','RENTED_OUT','RENTED_IN','MAINTENANCE','OFFLINE')
+)
+current_location TEXT
+notes TEXT
+created_at TIMESTAMP
+updated_at TIMESTAMP
+Index:
+INDEX (business_id, current_status)
+________________________________________
+4.2 external_asset_owners
+id UUID PK
+business_id UUID FK
+owner_name TEXT NOT NULL
+phone TEXT
+address TEXT
+notes TEXT
+created_at TIMESTAMP
+updated_at TIMESTAMP
+________________________________________
+4.3 rental_contracts
+Unified table for outgoing & incoming rentals.
+id UUID PK
+business_id UUID FK
+vehicle_id UUID FK
+rental_direction TEXT CHECK (rental_direction IN ('OUTGOING','INCOMING'))
+
+customer_id UUID NULL
+external_owner_id UUID NULL
+
+rental_start_datetime TIMESTAMP NOT NULL
+rental_end_datetime TIMESTAMP NOT NULL
+
+rate NUMERIC(15,2) NOT NULL
+total_amount NUMERIC(15,2) NOT NULL
+
+amount_paid NUMERIC(15,2) DEFAULT 0
+remaining_amount NUMERIC(15,2)
+
+financial_status TEXT CHECK (
+ financial_status IN ('PENDING','PARTIAL','FULLY_SETTLED')
+)
+
+operational_status TEXT CHECK (
+ operational_status IN ('ACTIVE','COMPLETED','CANCELLED')
+)
+
+location TEXT
+notes TEXT
+created_at TIMESTAMP
+updated_at TIMESTAMP
+Indexes:
+INDEX (business_id, rental_start_datetime)
+INDEX (vehicle_id, rental_start_datetime, rental_end_datetime)
+INDEX (vehicle_id, operational_status)
+________________________________________
+4.4 rental_payments
+id UUID PK
+business_id UUID FK
+rental_contract_id UUID FK
+amount NUMERIC(15,2)
+payment_date DATE
+mode TEXT
+notes TEXT
+created_at TIMESTAMP
+________________________________________
+=====================================
+5️⃣ OVERLAP PREVENTION
+=====================================
+Query before insert:
+SELECT 1
+FROM rental_contracts
+WHERE vehicle_id = :vehicle_id
+AND operational_status IN ('ACTIVE','MAINTENANCE')
+AND rental_start_datetime < :new_end
+AND rental_end_datetime > :new_start
+LIMIT 1;
+Reject if exists.
+________________________________________
+=====================================
+6️⃣ UNIFIED FINANCIAL LEDGER
+=====================================
+6.1 ledger_entries
+Tracks all financial movements.
+id UUID PK
+business_id UUID FK
+module TEXT CHECK (module IN ('GROCERY','RENTAL'))
+transaction_type TEXT
+reference_id UUID
+debit NUMERIC(15,2) DEFAULT 0
+credit NUMERIC(15,2) DEFAULT 0
+transaction_date DATE
+created_at TIMESTAMP
+Used for advanced reporting.
+________________________________________
+=====================================
+7️⃣ AUDIT LOG TABLE
+=====================================
+audit_logs
+id UUID PK
+business_id UUID FK
+user_id UUID
+action TEXT
+entity_type TEXT
+entity_id UUID
+old_value JSONB
+new_value JSONB
+created_at TIMESTAMP
+Tracks:
+•	Rental creation
+•	Payment entries
+•	Overrides
+•	Status changes
+________________________________________
+=====================================
+8️⃣ REPORT PERFORMANCE INDEXES
+=====================================
+Add indexes:
+INDEX purchases (business_id, purchase_date)
+INDEX sales (business_id, sale_date)
+INDEX rental_contracts (business_id, rental_start_datetime)
+INDEX grocery_payments (business_id, payment_date)
+INDEX rental_payments (business_id, payment_date)
+________________________________________
+=====================================
+9️⃣ ROW LEVEL SECURITY (MANDATORY)
+=====================================
+Enable RLS on ALL business tables.
+Policy example:
+USING (business_id = auth.jwt() ->> 'business_id')
+Prevents cross-business access.
+________________________________________
+=====================================
+🔟 FINAL PRODUCTION CHARACTERISTICS
+=====================================
+✔ Multi-tenant secure
+✔ No manual stock manipulation
+✔ Partial payment supported
+✔ Settlement tracking
+✔ Overlap-safe rental system
+✔ Indexed for performance
+✔ Audit logging enabled
+✔ Unified ledger available
+✔ Financially accurate
+✔ Production-grade schema
+________________________________________
+🏁 FINAL RESULT
+UMUGWANEZA LTD Database is now:
+Enterprise-grade
+Multi-module
+Financially controlled
+Fleet-aware
+Secure
+Scalable
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Supabase schema:
+
+=========================================
+✅ PART 1 — FULL SQL MIGRATION SCRIPT
+=========================================
+⚠ Run this in Supabase SQL Editor.
+________________________________________
+1️⃣ EXTENSIONS
+create extension if not exists "uuid-ossp";
+________________________________________
+2️⃣ BUSINESSES
+create table businesses (
+    id uuid primary key default uuid_generate_v4(),
+    name text not null,
+    currency text default 'RWF',
+    created_at timestamp default now(),
+    updated_at timestamp default now()
+);
+________________________________________
+3️⃣ USERS (Owner Only)
+create table users (
+    id uuid primary key default uuid_generate_v4(),
+    business_id uuid references businesses(id) on delete cascade,
+    auth_user_id uuid not null,
+    email text not null,
+    full_name text,
+    role text check (role in ('OWNER')) default 'OWNER',
+    is_active boolean default true,
+    created_at timestamp default now(),
+    updated_at timestamp default now()
+);
+
+create index idx_users_business on users(business_id);
+________________________________________
+=========================================
+🥬 GROCERY MODULE
+=========================================
+ITEMS
+create table items (
+    id uuid primary key default uuid_generate_v4(),
+    business_id uuid references businesses(id) on delete cascade,
+    item_name text not null,
+    measurement_type text check (measurement_type in ('WEIGHT','VOLUME')),
+    base_unit text check (base_unit in ('KG','LITRE')),
+    is_active boolean default true,
+    created_at timestamp default now(),
+    updated_at timestamp default now()
+);
+
+create index idx_items_business on items(business_id);
+________________________________________
+SUPPLIERS
+create table suppliers (
+    id uuid primary key default uuid_generate_v4(),
+    business_id uuid references businesses(id) on delete cascade,
+    supplier_name text not null,
+    phone text,
+    address text,
+    notes text,
+    created_at timestamp default now(),
+    updated_at timestamp default now()
+);
+
+create index idx_suppliers_business on suppliers(business_id);
+________________________________________
+CUSTOMERS
+create table customers (
+    id uuid primary key default uuid_generate_v4(),
+    business_id uuid references businesses(id) on delete cascade,
+    customer_name text not null,
+    phone text,
+    address text,
+    notes text,
+    created_at timestamp default now(),
+    updated_at timestamp default now()
+);
+
+create index idx_customers_business on customers(business_id);
+________________________________________
+PURCHASES
+create table purchases (
+    id uuid primary key default uuid_generate_v4(),
+    business_id uuid references businesses(id) on delete cascade,
+    supplier_id uuid references suppliers(id),
+    reference_no text,
+    purchase_date date not null,
+    total_quantity numeric(15,2) not null,
+    unit text,
+    unit_price numeric(15,2) not null,
+    total_purchase_cost numeric(15,2) not null,
+    amount_paid numeric(15,2) default 0,
+    remaining_amount numeric(15,2),
+    financial_status text check (
+        financial_status in ('PENDING','PARTIAL','FULLY_SETTLED')
+    ) default 'PENDING',
+    created_at timestamp default now(),
+    updated_at timestamp default now()
+);
+
+create index idx_purchases_business_date on purchases(business_id, purchase_date);
+________________________________________
+SALES
+create table sales (
+    id uuid primary key default uuid_generate_v4(),
+    business_id uuid references businesses(id) on delete cascade,
+    customer_id uuid references customers(id),
+    reference_no text,
+    sale_date date not null,
+    total_quantity numeric(15,2) not null,
+    unit text,
+    unit_price numeric(15,2) not null,
+    total_sale_amount numeric(15,2) not null,
+    amount_received numeric(15,2) default 0,
+    remaining_amount numeric(15,2),
+    financial_status text check (
+        financial_status in ('PENDING','PARTIAL','FULLY_RECEIVED')
+    ) default 'PENDING',
+    created_at timestamp default now(),
+    updated_at timestamp default now()
+);
+
+create index idx_sales_business_date on sales(business_id, sale_date);
+________________________________________
+GROCERY PAYMENTS
+create table grocery_payments (
+    id uuid primary key default uuid_generate_v4(),
+    business_id uuid references businesses(id) on delete cascade,
+    reference_type text check (reference_type in ('PURCHASE','SALE')),
+    reference_id uuid not null,
+    amount numeric(15,2) not null,
+    payment_date date not null,
+    mode text,
+    notes text,
+    created_at timestamp default now()
+);
+
+create index idx_grocery_payments_business on grocery_payments(business_id);
+________________________________________
+=========================================
+🚛 RENTAL MODULE
+=========================================
+VEHICLES
+create table vehicles (
+    id uuid primary key default uuid_generate_v4(),
+    business_id uuid references businesses(id) on delete cascade,
+    vehicle_name text not null,
+    vehicle_type text check (vehicle_type in ('TRUCK','MACHINE')),
+    rental_type text check (rental_type in ('DAY','HOUR')),
+    ownership_type text check (ownership_type in ('OWN','EXTERNAL')),
+    registration_number text,
+    capacity text,
+    base_rate numeric(15,2),
+    current_status text check (
+        current_status in ('AVAILABLE','RENTED_OUT','RENTED_IN','MAINTENANCE','OFFLINE')
+    ) default 'AVAILABLE',
+    current_location text,
+    notes text,
+    created_at timestamp default now(),
+    updated_at timestamp default now()
+);
+
+create index idx_vehicles_business on vehicles(business_id);
+________________________________________
+EXTERNAL OWNERS
+create table external_asset_owners (
+    id uuid primary key default uuid_generate_v4(),
+    business_id uuid references businesses(id) on delete cascade,
+    owner_name text not null,
+    phone text,
+    address text,
+    notes text,
+    created_at timestamp default now(),
+    updated_at timestamp default now()
+);
+________________________________________
+RENTAL CONTRACTS
+create table rental_contracts (
+    id uuid primary key default uuid_generate_v4(),
+    business_id uuid references businesses(id) on delete cascade,
+    vehicle_id uuid references vehicles(id),
+    rental_direction text check (rental_direction in ('OUTGOING','INCOMING')),
+    customer_id uuid references customers(id),
+    external_owner_id uuid references external_asset_owners(id),
+    rental_start_datetime timestamp not null,
+    rental_end_datetime timestamp not null,
+    rate numeric(15,2) not null,
+    total_amount numeric(15,2) not null,
+    amount_paid numeric(15,2) default 0,
+    remaining_amount numeric(15,2),
+    financial_status text check (
+        financial_status in ('PENDING','PARTIAL','FULLY_SETTLED')
+    ) default 'PENDING',
+    operational_status text check (
+        operational_status in ('ACTIVE','COMPLETED','CANCELLED')
+    ) default 'ACTIVE',
+    location text,
+    notes text,
+    created_at timestamp default now(),
+    updated_at timestamp default now()
+);
+
+create index idx_rentals_business_date on rental_contracts(business_id, rental_start_datetime);
+create index idx_rentals_vehicle_overlap on rental_contracts(vehicle_id, rental_start_datetime, rental_end_datetime);
+________________________________________
+RENTAL PAYMENTS
+create table rental_payments (
+    id uuid primary key default uuid_generate_v4(),
+    business_id uuid references businesses(id) on delete cascade,
+    rental_contract_id uuid references rental_contracts(id),
+    amount numeric(15,2),
+    payment_date date,
+    mode text,
+    notes text,
+    created_at timestamp default now()
+);
+
+create index idx_rental_payments_business on rental_payments(business_id);
+________________________________________
+=========================================
+🔐 ROW LEVEL SECURITY (RLS)
+=========================================
+Enable for all business tables:
+Example:
+alter table items enable row level security;
+
+create policy "Business isolation"
+on items
+for all
+using (business_id = auth.jwt() ->> 'business_id');
+Repeat for:
+•	suppliers
+•	customers
+•	purchases
+•	sales
+•	vehicles
+•	rental_contracts
+•	payments tables
+________________________________________
+=========================================
+🌐 API ENDPOINT DESIGN
+=========================================
+Using Supabase REST / Edge Functions.
+Base URL:
+/api/v1
+________________________________________
+AUTH
+POST /auth/login
+POST /auth/logout
+________________________________________
+GROCERY
+GET /items
+POST /items
+PUT /items/{id}
+GET /purchases
+POST /purchases
+POST /purchases/{id}/payment
+GET /sales
+POST /sales
+POST /sales/{id}/payment
+GET /stock-summary
+________________________________________
+RENTAL
+GET /vehicles
+POST /vehicles
+GET /rentals
+POST /rentals
+POST /rentals/{id}/payment
+GET /rentals/availability?vehicle_id=&start=&end=
+________________________________________
+REPORTS
+GET /reports/daily?date=
+GET /reports/monthly?month=&year=
+GET /reports/custom?from=&to=
+GET /reports/outstanding
+GET /reports/rental-profit
+________________________________________
+=========================================
+🗂 ER DIAGRAM EXPLANATION (CLEAR)
+=========================================
+Core Relationships:
+Business
+├── Users
+├── Items
+├── Suppliers
+├── Customers
+├── Purchases
+│ └── Grocery Payments
+├── Sales
+│ └── Grocery Payments
+├── Vehicles
+│ ├── Rental Contracts
+│ │ └── Rental Payments
+└── External Asset Owners
+Key Concepts:
+•	One Business → Many Items
+•	One Item → Many Purchases & Sales
+•	One Vehicle → Many Rental Contracts
+•	One Rental → Many Payments
+•	Payments never overwrite totals
+•	Stock derived from purchases − sales
+•	Rental overlap controlled by datetime logic
+________________________________________
+🏁 FINAL STATUS
+Your Supabase-level system is now:
+✔ Fully normalized
+✔ Multi-tenant safe
+✔ RLS secured
+✔ Overlap protected
+✔ Financially accurate
+✔ Scalable
+✔ Production ready
+
