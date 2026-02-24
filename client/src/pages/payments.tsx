@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Purchase, Sale, InsertGroceryPayment } from "@shared/schema";
 import { insertGroceryPaymentSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,8 +19,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, CreditCard } from "lucide-react";
 
-const BUSINESS_ID = "biz_001";
-
 function formatRWF(amount: number) {
   return new Intl.NumberFormat("en-RW").format(Math.round(amount)) + " RWF";
 }
@@ -32,40 +29,15 @@ export default function PaymentsPage() {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   const { data: payments, isLoading } = useQuery({
-    queryKey: ["/grocery-payments"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("grocery_payments")
-        .select("*")
-        .eq("business_id", BUSINESS_ID)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryKey: ["/api/grocery-payments"],
   });
 
   const { data: pendingPurchases } = useQuery<Purchase[]>({
-    queryKey: ["/purchases/pending"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("purchases")
-        .select("*, supplier:suppliers(*)")
-        .eq("business_id", BUSINESS_ID)
-        .gt("remaining_amount", 0);
-      return data || [];
-    },
+    queryKey: ["/api/purchases?pending=true"],
   });
 
   const { data: pendingSales } = useQuery<Sale[]>({
-    queryKey: ["/sales/pending"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("sales")
-        .select("*, customer:customers(*)")
-        .eq("business_id", BUSINESS_ID)
-        .gt("remaining_amount", 0);
-      return data || [];
-    },
+    queryKey: ["/api/sales?pending=true"],
   });
 
   const form = useForm<InsertGroceryPayment>({
@@ -77,36 +49,22 @@ export default function PaymentsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertGroceryPayment) => {
-      const { error: payError } = await supabase.from("grocery_payments").insert({ ...values, business_id: BUSINESS_ID });
-      if (payError) throw payError;
-
-      if (values.reference_type === "PURCHASE") {
-        const purchase = pendingPurchases?.find((p) => p.id === values.reference_id);
-        if (purchase) {
-          const newPaid = purchase.amount_paid + values.amount;
-          const newRemaining = Math.max(0, purchase.total_purchase_cost - newPaid);
-          let status: "PENDING" | "PARTIAL" | "FULLY_SETTLED" = "PARTIAL";
-          if (newRemaining <= 0) status = "FULLY_SETTLED";
-          await supabase.from("purchases").update({ amount_paid: newPaid, remaining_amount: newRemaining, financial_status: status }).eq("id", purchase.id);
-        }
-      } else {
-        const sale = pendingSales?.find((s) => s.id === values.reference_id);
-        if (sale) {
-          const newReceived = sale.amount_received + values.amount;
-          const newRemaining = Math.max(0, sale.total_sale_amount - newReceived);
-          let status: "PENDING" | "PARTIAL" | "FULLY_RECEIVED" = "PARTIAL";
-          if (newRemaining <= 0) status = "FULLY_RECEIVED";
-          await supabase.from("sales").update({ amount_received: newReceived, remaining_amount: newRemaining, financial_status: status }).eq("id", sale.id);
-        }
-      }
+      await apiRequest("POST", "/api/grocery-payments", {
+        reference_type: values.reference_type,
+        reference_id: values.reference_id,
+        amount: values.amount,
+        payment_date: values.payment_date,
+        mode: values.mode,
+        notes: values.notes,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/grocery-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["/purchases"] });
-      queryClient.invalidateQueries({ queryKey: ["/purchases/pending"] });
-      queryClient.invalidateQueries({ queryKey: ["/sales"] });
-      queryClient.invalidateQueries({ queryKey: ["/sales/pending"] });
-      queryClient.invalidateQueries({ queryKey: ["/dashboard/grocery"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/grocery-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchases?pending=true"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales?pending=true"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/grocery"] });
       setPaymentSuccess(true);
       setTimeout(() => {
         setPaymentSuccess(false);
@@ -134,7 +92,7 @@ export default function PaymentsPage() {
           <DialogContent>
             <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
             {paymentSuccess ? (
-              <div className="flex flex-col items-center justify-center py-8 animate-in fade-in zoom-in-95 duration-[400ms] ease-in-out">
+              <div className="flex flex-col items-center justify-center py-8 animate-in fade-in zoom-in-95">
                 <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
                   <CreditCard className="h-8 w-8 text-green-600" />
                 </div>

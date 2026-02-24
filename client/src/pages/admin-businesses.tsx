@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,22 +17,15 @@ export default function AdminBusinessesPage() {
   const [name, setName] = useState("");
 
   const { data: businesses, isLoading } = useQuery({
-    queryKey: ["/admin/businesses"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("businesses").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryKey: ["/api/businesses"],
   });
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const id = "biz_" + Date.now().toString(36);
-      const { error } = await supabase.from("businesses").insert({ id, name, currency: "RWF" });
-      if (error) throw error;
+      await apiRequest("POST", "/api/businesses", { name });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/admin/businesses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/businesses"] });
       toast({ title: "Business created" });
       setName("");
       setOpen(false);

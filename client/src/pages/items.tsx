@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Item, InsertItem } from "@shared/schema";
 import { insertItemSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,23 +18,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Package } from "lucide-react";
 
-const BUSINESS_ID = "biz_001";
-
 export default function ItemsPage() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
 
   const { data: items, isLoading } = useQuery<Item[]>({
-    queryKey: ["/items"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("items")
-        .select("*")
-        .eq("business_id", BUSINESS_ID)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryKey: ["/api/items"],
   });
 
   const form = useForm<InsertItem>({
@@ -45,11 +33,10 @@ export default function ItemsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertItem) => {
-      const { error } = await supabase.from("items").insert({ ...values, business_id: BUSINESS_ID });
-      if (error) throw error;
+      await apiRequest("POST", "/api/items", values);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/items"] });
       toast({ title: "Item created successfully" });
       form.reset();
       setOpen(false);

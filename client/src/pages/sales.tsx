@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Sale, InsertSale, Customer, Item } from "@shared/schema";
 import { insertSaleSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,8 +17,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, TrendingUp } from "lucide-react";
 
-const BUSINESS_ID = "biz_001";
-
 function formatRWF(amount: number) {
   return new Intl.NumberFormat("en-RW").format(Math.round(amount)) + " RWF";
 }
@@ -35,32 +32,15 @@ export default function SalesPage() {
   const [open, setOpen] = useState(false);
 
   const { data: sales, isLoading } = useQuery<Sale[]>({
-    queryKey: ["/sales"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sales")
-        .select("*, customer:customers(*), item:items(*)")
-        .eq("business_id", BUSINESS_ID)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryKey: ["/api/sales"],
   });
 
   const { data: customers } = useQuery<Customer[]>({
-    queryKey: ["/customers"],
-    queryFn: async () => {
-      const { data } = await supabase.from("customers").select("*").eq("business_id", BUSINESS_ID);
-      return data || [];
-    },
+    queryKey: ["/api/customers"],
   });
 
   const { data: items } = useQuery<Item[]>({
-    queryKey: ["/items"],
-    queryFn: async () => {
-      const { data } = await supabase.from("items").select("*").eq("business_id", BUSINESS_ID).eq("is_active", true);
-      return data || [];
-    },
+    queryKey: ["/api/items?active=true"],
   });
 
   const form = useForm<InsertSale>({
@@ -76,26 +56,19 @@ export default function SalesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertSale) => {
-      const total = values.total_quantity * values.unit_price;
-      const rem = total - values.amount_received;
-      let status: "PENDING" | "PARTIAL" | "FULLY_RECEIVED" = "PENDING";
-      if (values.amount_received >= total) status = "FULLY_RECEIVED";
-      else if (values.amount_received > 0) status = "PARTIAL";
-
-      const refNo = "SAL-" + Date.now().toString(36).toUpperCase();
-      const { error } = await supabase.from("sales").insert({
-        ...values,
-        business_id: BUSINESS_ID,
-        reference_no: refNo,
-        total_sale_amount: total,
-        remaining_amount: Math.max(0, rem),
-        financial_status: status,
+      await apiRequest("POST", "/api/sales", {
+        customer_id: values.customer_id,
+        sale_date: values.sale_date,
+        item_id: values.item_id,
+        total_quantity: values.total_quantity,
+        unit: values.unit,
+        unit_price: values.unit_price,
+        amount_received: values.amount_received,
       });
-      if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/sales"] });
-      queryClient.invalidateQueries({ queryKey: ["/dashboard/grocery"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/grocery"] });
       toast({ title: "Sale recorded successfully" });
       form.reset();
       setOpen(false);

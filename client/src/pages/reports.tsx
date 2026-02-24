@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Download } from "lucide-react";
-
-const BUSINESS_ID = "biz_001";
 
 function formatRWF(amount: number) {
   return new Intl.NumberFormat("en-RW").format(Math.round(amount));
@@ -31,39 +28,8 @@ type ReportRow = {
 export default function ReportsPage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
 
-  const { data: reportData, isLoading } = useQuery({
-    queryKey: ["/reports", selectedDate],
-    queryFn: async () => {
-      const rows: ReportRow[] = [];
-
-      const [purchasesRes, salesRes, outgoingRes, incomingRes] = await Promise.all([
-        supabase.from("purchases").select("*, supplier:suppliers(*), item:items(*)").eq("business_id", BUSINESS_ID).eq("purchase_date", selectedDate),
-        supabase.from("sales").select("*, customer:customers(*), item:items(*)").eq("business_id", BUSINESS_ID).eq("sale_date", selectedDate),
-        supabase.from("rental_contracts").select("*, vehicle:vehicles(*), customer:customers(*)").eq("business_id", BUSINESS_ID).eq("rental_direction", "OUTGOING").gte("rental_start_datetime", selectedDate + "T00:00:00").lte("rental_start_datetime", selectedDate + "T23:59:59"),
-        supabase.from("rental_contracts").select("*, vehicle:vehicles(*), external_owner:external_asset_owners(*)").eq("business_id", BUSINESS_ID).eq("rental_direction", "INCOMING").gte("rental_start_datetime", selectedDate + "T00:00:00").lte("rental_start_datetime", selectedDate + "T23:59:59"),
-      ]);
-
-      for (const p of purchasesRes.data || []) {
-        rows.push({ type: "Purchase", reference: p.reference_no, party: p.supplier?.supplier_name || "—", item_vehicle: p.item?.item_name || "—", quantity: `${p.total_quantity} ${p.unit}`, total: p.total_purchase_cost, paid: p.amount_paid, remaining: p.remaining_amount, status: p.financial_status });
-      }
-      for (const s of salesRes.data || []) {
-        rows.push({ type: "Sale", reference: s.reference_no, party: s.customer?.customer_name || "—", item_vehicle: s.item?.item_name || "—", quantity: `${s.total_quantity} ${s.unit}`, total: s.total_sale_amount, paid: s.amount_received, remaining: s.remaining_amount, status: s.financial_status });
-      }
-      for (const r of outgoingRes.data || []) {
-        rows.push({ type: "Rental Out", reference: `RNT-${r.id.slice(0, 8)}`, party: r.customer?.customer_name || "—", item_vehicle: r.vehicle?.vehicle_name || "—", quantity: "—", total: r.total_amount, paid: r.amount_paid, remaining: r.remaining_amount, status: r.financial_status });
-      }
-      for (const r of incomingRes.data || []) {
-        rows.push({ type: "Rental In", reference: `RNT-${r.id.slice(0, 8)}`, party: r.external_owner?.owner_name || "—", item_vehicle: r.vehicle?.vehicle_name || "—", quantity: "—", total: r.total_amount, paid: r.amount_paid, remaining: r.remaining_amount, status: r.financial_status });
-      }
-
-      const totalPurchase = rows.filter(r => r.type === "Purchase").reduce((s, r) => s + r.total, 0);
-      const totalSales = rows.filter(r => r.type === "Sale").reduce((s, r) => s + r.total, 0);
-      const totalRentalRevenue = rows.filter(r => r.type === "Rental Out").reduce((s, r) => s + r.total, 0);
-      const totalRentalCost = rows.filter(r => r.type === "Rental In").reduce((s, r) => s + r.total, 0);
-      const netProfit = totalSales - totalPurchase + totalRentalRevenue - totalRentalCost;
-
-      return { rows, totalPurchase, totalSales, totalRentalRevenue, totalRentalCost, netProfit };
-    },
+  const { data: reportData, isLoading } = useQuery<{ rows: ReportRow[]; totalPurchase: number; totalSales: number; totalRentalRevenue: number; totalRentalCost: number; netProfit: number }>({
+    queryKey: ["/api/reports/daily?date=" + selectedDate],
   });
 
   const downloadCSV = () => {

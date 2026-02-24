@@ -1,18 +1,9 @@
 -- UMUGWANEZA LTD - Database Setup Script
 -- Run this in your Supabase SQL Editor (Dashboard > SQL Editor)
--- This creates the umugwaneza schema and all required tables
-
-CREATE SCHEMA IF NOT EXISTS umugwaneza;
-
--- Grant access to the schema
-GRANT USAGE ON SCHEMA umugwaneza TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA umugwaneza TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA umugwaneza TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA umugwaneza GRANT ALL ON TABLES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA umugwaneza GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+-- Creates all required tables in the public schema
 
 -- Businesses
-CREATE TABLE IF NOT EXISTS umugwaneza.businesses (
+CREATE TABLE IF NOT EXISTS businesses (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   currency TEXT DEFAULT 'RWF',
@@ -21,9 +12,9 @@ CREATE TABLE IF NOT EXISTS umugwaneza.businesses (
 );
 
 -- Items
-CREATE TABLE IF NOT EXISTS umugwaneza.items (
+CREATE TABLE IF NOT EXISTS items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id TEXT NOT NULL REFERENCES umugwaneza.businesses(id),
+  business_id TEXT NOT NULL REFERENCES businesses(id),
   item_name TEXT NOT NULL,
   measurement_type TEXT NOT NULL CHECK (measurement_type IN ('WEIGHT', 'VOLUME')),
   base_unit TEXT NOT NULL CHECK (base_unit IN ('KG', 'LITRE')),
@@ -33,9 +24,9 @@ CREATE TABLE IF NOT EXISTS umugwaneza.items (
 );
 
 -- Suppliers
-CREATE TABLE IF NOT EXISTS umugwaneza.suppliers (
+CREATE TABLE IF NOT EXISTS suppliers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id TEXT NOT NULL REFERENCES umugwaneza.businesses(id),
+  business_id TEXT NOT NULL REFERENCES businesses(id),
   supplier_name TEXT NOT NULL,
   phone TEXT,
   address TEXT,
@@ -45,9 +36,9 @@ CREATE TABLE IF NOT EXISTS umugwaneza.suppliers (
 );
 
 -- Customers
-CREATE TABLE IF NOT EXISTS umugwaneza.customers (
+CREATE TABLE IF NOT EXISTS customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id TEXT NOT NULL REFERENCES umugwaneza.businesses(id),
+  business_id TEXT NOT NULL REFERENCES businesses(id),
   customer_name TEXT NOT NULL,
   phone TEXT,
   address TEXT,
@@ -57,13 +48,13 @@ CREATE TABLE IF NOT EXISTS umugwaneza.customers (
 );
 
 -- Purchases
-CREATE TABLE IF NOT EXISTS umugwaneza.purchases (
+CREATE TABLE IF NOT EXISTS purchases (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id TEXT NOT NULL REFERENCES umugwaneza.businesses(id),
-  supplier_id UUID NOT NULL REFERENCES umugwaneza.suppliers(id),
+  business_id TEXT NOT NULL REFERENCES businesses(id),
+  supplier_id UUID NOT NULL REFERENCES suppliers(id),
   reference_no TEXT NOT NULL,
   purchase_date DATE NOT NULL,
-  item_id UUID NOT NULL REFERENCES umugwaneza.items(id),
+  item_id UUID NOT NULL REFERENCES items(id),
   total_quantity NUMERIC NOT NULL,
   unit TEXT NOT NULL,
   unit_price NUMERIC NOT NULL,
@@ -76,13 +67,13 @@ CREATE TABLE IF NOT EXISTS umugwaneza.purchases (
 );
 
 -- Sales
-CREATE TABLE IF NOT EXISTS umugwaneza.sales (
+CREATE TABLE IF NOT EXISTS sales (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id TEXT NOT NULL REFERENCES umugwaneza.businesses(id),
-  customer_id UUID NOT NULL REFERENCES umugwaneza.customers(id),
+  business_id TEXT NOT NULL REFERENCES businesses(id),
+  customer_id UUID NOT NULL REFERENCES customers(id),
   reference_no TEXT NOT NULL,
   sale_date DATE NOT NULL,
-  item_id UUID NOT NULL REFERENCES umugwaneza.items(id),
+  item_id UUID NOT NULL REFERENCES items(id),
   total_quantity NUMERIC NOT NULL,
   unit TEXT NOT NULL,
   unit_price NUMERIC NOT NULL,
@@ -95,9 +86,9 @@ CREATE TABLE IF NOT EXISTS umugwaneza.sales (
 );
 
 -- Grocery Payments
-CREATE TABLE IF NOT EXISTS umugwaneza.grocery_payments (
+CREATE TABLE IF NOT EXISTS grocery_payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id TEXT NOT NULL REFERENCES umugwaneza.businesses(id),
+  business_id TEXT NOT NULL REFERENCES businesses(id),
   reference_type TEXT NOT NULL CHECK (reference_type IN ('PURCHASE', 'SALE')),
   reference_id UUID NOT NULL,
   amount NUMERIC NOT NULL,
@@ -108,9 +99,9 @@ CREATE TABLE IF NOT EXISTS umugwaneza.grocery_payments (
 );
 
 -- External Asset Owners
-CREATE TABLE IF NOT EXISTS umugwaneza.external_asset_owners (
+CREATE TABLE IF NOT EXISTS external_asset_owners (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id TEXT NOT NULL REFERENCES umugwaneza.businesses(id),
+  business_id TEXT NOT NULL REFERENCES businesses(id),
   owner_name TEXT NOT NULL,
   phone TEXT,
   address TEXT,
@@ -119,10 +110,10 @@ CREATE TABLE IF NOT EXISTS umugwaneza.external_asset_owners (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Vehicles
-CREATE TABLE IF NOT EXISTS umugwaneza.vehicles (
+-- Fleet Vehicles (named fleet_vehicles to avoid conflict with HAPYJO vehicles table)
+CREATE TABLE IF NOT EXISTS fleet_vehicles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id TEXT NOT NULL REFERENCES umugwaneza.businesses(id),
+  business_id TEXT NOT NULL REFERENCES businesses(id),
   hapyjo_vehicle_id TEXT,
   vehicle_name TEXT NOT NULL,
   vehicle_type TEXT NOT NULL CHECK (vehicle_type IN ('TRUCK', 'MACHINE')),
@@ -137,13 +128,13 @@ CREATE TABLE IF NOT EXISTS umugwaneza.vehicles (
 );
 
 -- Rental Contracts
-CREATE TABLE IF NOT EXISTS umugwaneza.rental_contracts (
+CREATE TABLE IF NOT EXISTS rental_contracts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id TEXT NOT NULL REFERENCES umugwaneza.businesses(id),
-  vehicle_id UUID NOT NULL REFERENCES umugwaneza.vehicles(id),
+  business_id TEXT NOT NULL REFERENCES businesses(id),
+  vehicle_id UUID NOT NULL REFERENCES fleet_vehicles(id),
   rental_direction TEXT NOT NULL CHECK (rental_direction IN ('OUTGOING', 'INCOMING')),
-  customer_id UUID REFERENCES umugwaneza.customers(id),
-  external_owner_id UUID REFERENCES umugwaneza.external_asset_owners(id),
+  customer_id UUID REFERENCES customers(id),
+  external_owner_id UUID REFERENCES external_asset_owners(id),
   rental_start_datetime TIMESTAMPTZ NOT NULL,
   rental_end_datetime TIMESTAMPTZ NOT NULL,
   rate NUMERIC NOT NULL,
@@ -159,10 +150,10 @@ CREATE TABLE IF NOT EXISTS umugwaneza.rental_contracts (
 );
 
 -- Rental Payments
-CREATE TABLE IF NOT EXISTS umugwaneza.rental_payments (
+CREATE TABLE IF NOT EXISTS rental_payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id TEXT NOT NULL REFERENCES umugwaneza.businesses(id),
-  rental_contract_id UUID NOT NULL REFERENCES umugwaneza.rental_contracts(id),
+  business_id TEXT NOT NULL REFERENCES businesses(id),
+  rental_contract_id UUID NOT NULL REFERENCES rental_contracts(id),
   amount NUMERIC NOT NULL,
   payment_date DATE NOT NULL,
   mode TEXT NOT NULL,
@@ -171,16 +162,16 @@ CREATE TABLE IF NOT EXISTS umugwaneza.rental_payments (
 );
 
 -- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_items_business ON umugwaneza.items(business_id);
-CREATE INDEX IF NOT EXISTS idx_suppliers_business ON umugwaneza.suppliers(business_id);
-CREATE INDEX IF NOT EXISTS idx_customers_business ON umugwaneza.customers(business_id);
-CREATE INDEX IF NOT EXISTS idx_purchases_business ON umugwaneza.purchases(business_id);
-CREATE INDEX IF NOT EXISTS idx_sales_business ON umugwaneza.sales(business_id);
-CREATE INDEX IF NOT EXISTS idx_vehicles_business ON umugwaneza.vehicles(business_id);
-CREATE INDEX IF NOT EXISTS idx_rental_contracts_business ON umugwaneza.rental_contracts(business_id);
-CREATE INDEX IF NOT EXISTS idx_rental_contracts_vehicle ON umugwaneza.rental_contracts(vehicle_id);
-CREATE INDEX IF NOT EXISTS idx_vehicles_hapyjo ON umugwaneza.vehicles(hapyjo_vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_items_business ON items(business_id);
+CREATE INDEX IF NOT EXISTS idx_suppliers_business ON suppliers(business_id);
+CREATE INDEX IF NOT EXISTS idx_customers_business ON customers(business_id);
+CREATE INDEX IF NOT EXISTS idx_purchases_business ON purchases(business_id);
+CREATE INDEX IF NOT EXISTS idx_sales_business ON sales(business_id);
+CREATE INDEX IF NOT EXISTS idx_fleet_vehicles_business ON fleet_vehicles(business_id);
+CREATE INDEX IF NOT EXISTS idx_rental_contracts_business ON rental_contracts(business_id);
+CREATE INDEX IF NOT EXISTS idx_rental_contracts_vehicle ON rental_contracts(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_fleet_vehicles_hapyjo ON fleet_vehicles(hapyjo_vehicle_id);
 
--- Expose umugwaneza schema to PostgREST (Supabase API)
--- This is critical for the Supabase client to access the schema
-NOTIFY pgrst, 'reload schema';
+-- Grant access
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;

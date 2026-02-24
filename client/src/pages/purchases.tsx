@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Purchase, InsertPurchase, Supplier, Item } from "@shared/schema";
 import { insertPurchaseSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,8 +17,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, ShoppingCart } from "lucide-react";
 
-const BUSINESS_ID = "biz_001";
-
 function formatRWF(amount: number) {
   return new Intl.NumberFormat("en-RW").format(Math.round(amount)) + " RWF";
 }
@@ -35,32 +32,15 @@ export default function PurchasesPage() {
   const [open, setOpen] = useState(false);
 
   const { data: purchases, isLoading } = useQuery<Purchase[]>({
-    queryKey: ["/purchases"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("purchases")
-        .select("*, supplier:suppliers(*), item:items(*)")
-        .eq("business_id", BUSINESS_ID)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryKey: ["/api/purchases"],
   });
 
   const { data: suppliers } = useQuery<Supplier[]>({
-    queryKey: ["/suppliers"],
-    queryFn: async () => {
-      const { data } = await supabase.from("suppliers").select("*").eq("business_id", BUSINESS_ID);
-      return data || [];
-    },
+    queryKey: ["/api/suppliers"],
   });
 
   const { data: items } = useQuery<Item[]>({
-    queryKey: ["/items"],
-    queryFn: async () => {
-      const { data } = await supabase.from("items").select("*").eq("business_id", BUSINESS_ID).eq("is_active", true);
-      return data || [];
-    },
+    queryKey: ["/api/items?active=true"],
   });
 
   const form = useForm<InsertPurchase>({
@@ -76,26 +56,19 @@ export default function PurchasesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertPurchase) => {
-      const total = values.total_quantity * values.unit_price;
-      const rem = total - values.amount_paid;
-      let status: "PENDING" | "PARTIAL" | "FULLY_SETTLED" = "PENDING";
-      if (values.amount_paid >= total) status = "FULLY_SETTLED";
-      else if (values.amount_paid > 0) status = "PARTIAL";
-
-      const refNo = "PUR-" + Date.now().toString(36).toUpperCase();
-      const { error } = await supabase.from("purchases").insert({
-        ...values,
-        business_id: BUSINESS_ID,
-        reference_no: refNo,
-        total_purchase_cost: total,
-        remaining_amount: Math.max(0, rem),
-        financial_status: status,
+      await apiRequest("POST", "/api/purchases", {
+        supplier_id: values.supplier_id,
+        purchase_date: values.purchase_date,
+        item_id: values.item_id,
+        total_quantity: values.total_quantity,
+        unit: values.unit,
+        unit_price: values.unit_price,
+        amount_paid: values.amount_paid,
       });
-      if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/purchases"] });
-      queryClient.invalidateQueries({ queryKey: ["/dashboard/grocery"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/grocery"] });
       toast({ title: "Purchase recorded successfully" });
       form.reset();
       setOpen(false);

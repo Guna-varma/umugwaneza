@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { ExternalAssetOwner, InsertExternalOwner } from "@shared/schema";
 import { insertExternalOwnerSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,19 +16,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, UserPlus } from "lucide-react";
 
-const BUSINESS_ID = "biz_001";
-
 export default function ExternalOwnersPage() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
 
   const { data: owners, isLoading } = useQuery<ExternalAssetOwner[]>({
-    queryKey: ["/external-owners"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("external_asset_owners").select("*").eq("business_id", BUSINESS_ID).order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryKey: ["/api/external-owners"],
   });
 
   const form = useForm<InsertExternalOwner>({
@@ -39,11 +31,10 @@ export default function ExternalOwnersPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertExternalOwner) => {
-      const { error } = await supabase.from("external_asset_owners").insert({ ...values, business_id: BUSINESS_ID });
-      if (error) throw error;
+      await apiRequest("POST", "/api/external-owners", values);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/external-owners"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/external-owners"] });
       toast({ title: "External owner added successfully" });
       form.reset();
       setOpen(false);

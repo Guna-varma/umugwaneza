@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { RentalContract, InsertRentalContract, Vehicle, Customer, ExternalAssetOwner, RentalPayment, InsertRentalPayment } from "@shared/schema";
 import { insertRentalContractSchema, insertRentalPaymentSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,8 +17,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, ArrowUpRight, ArrowDownLeft, CreditCard } from "lucide-react";
-
-const BUSINESS_ID = "biz_001";
 
 function formatRWF(amount: number) {
   return new Intl.NumberFormat("en-RW").format(Math.round(amount)) + " RWF";
@@ -61,41 +58,19 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
   const isOutgoing = direction === "OUTGOING";
 
   const { data: contracts, isLoading } = useQuery<RentalContract[]>({
-    queryKey: ["/rental-contracts", direction],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("rental_contracts")
-        .select("*, vehicle:vehicles(*), customer:customers(*), external_owner:external_asset_owners(*)")
-        .eq("business_id", BUSINESS_ID)
-        .eq("rental_direction", direction)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryKey: ["/api/rental-contracts?direction=" + direction],
   });
 
   const { data: vehicles } = useQuery<Vehicle[]>({
-    queryKey: ["/vehicles"],
-    queryFn: async () => {
-      const { data } = await supabase.from("vehicles").select("*").eq("business_id", BUSINESS_ID);
-      return data || [];
-    },
+    queryKey: ["/api/vehicles"],
   });
 
   const { data: customers } = useQuery<Customer[]>({
-    queryKey: ["/customers"],
-    queryFn: async () => {
-      const { data } = await supabase.from("customers").select("*").eq("business_id", BUSINESS_ID);
-      return data || [];
-    },
+    queryKey: ["/api/customers"],
   });
 
   const { data: externalOwners } = useQuery<ExternalAssetOwner[]>({
-    queryKey: ["/external-owners"],
-    queryFn: async () => {
-      const { data } = await supabase.from("external_asset_owners").select("*").eq("business_id", BUSINESS_ID);
-      return data || [];
-    },
+    queryKey: ["/api/external-owners"],
   });
 
   const form = useForm<InsertRentalContract>({
@@ -116,42 +91,22 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertRentalContract) => {
-      const vehicle = vehicles?.find((v) => v.id === values.vehicle_id);
-      if (!vehicle) throw new Error("Vehicle not found");
-
-      const { data: overlapping } = await supabase
-        .from("rental_contracts")
-        .select("id")
-        .eq("vehicle_id", values.vehicle_id)
-        .eq("operational_status", "ACTIVE")
-        .lt("rental_start_datetime", values.rental_end_datetime)
-        .gt("rental_end_datetime", values.rental_start_datetime);
-
-      if (overlapping && overlapping.length > 0) {
-        throw new Error("This vehicle has an overlapping active rental contract for the selected period.");
-      }
-
-      const total = calculateTotal(values.rental_start_datetime, values.rental_end_datetime, values.rate, vehicle.rental_type);
-
-      const { error } = await supabase.from("rental_contracts").insert({
-        ...values,
-        business_id: BUSINESS_ID,
+      await apiRequest("POST", "/api/rental-contracts", {
+        vehicle_id: values.vehicle_id,
         rental_direction: direction,
-        total_amount: total,
-        amount_paid: 0,
-        remaining_amount: total,
-        financial_status: "PENDING",
-        operational_status: "ACTIVE",
+        customer_id: values.customer_id,
+        external_owner_id: values.external_owner_id,
+        rental_start_datetime: values.rental_start_datetime,
+        rental_end_datetime: values.rental_end_datetime,
+        rate: values.rate,
+        location: values.location,
+        notes: values.notes,
       });
-      if (error) throw error;
-
-      const newStatus = isOutgoing ? "RENTED_OUT" : "RENTED_IN";
-      await supabase.from("vehicles").update({ current_status: newStatus }).eq("id", values.vehicle_id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/rental-contracts", direction] });
-      queryClient.invalidateQueries({ queryKey: ["/vehicles"] });
-      queryClient.invalidateQueries({ queryKey: ["/dashboard/rental"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rental-contracts?direction=" + direction] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/rental"] });
       toast({ title: "Rental contract created" });
       form.reset({ vehicle_id: "", rental_direction: direction, customer_id: null, external_owner_id: null, rental_start_datetime: "", rental_end_datetime: "", rate: 0, location: "", notes: "" });
       setOpen(false);
@@ -161,12 +116,11 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
 
   const completeMutation = useMutation({
     mutationFn: async (contract: RentalContract) => {
-      await supabase.from("rental_contracts").update({ operational_status: "COMPLETED" }).eq("id", contract.id);
-      await supabase.from("vehicles").update({ current_status: "AVAILABLE" }).eq("id", contract.vehicle_id);
+      await apiRequest("PATCH", "/api/rental-contracts/" + contract.id + "/complete");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/rental-contracts", direction] });
-      queryClient.invalidateQueries({ queryKey: ["/vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rental-contracts?direction=" + direction] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
       toast({ title: "Contract marked as completed" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -179,18 +133,16 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
 
   const payMutation = useMutation({
     mutationFn: async (values: InsertRentalPayment) => {
-      const { error } = await supabase.from("rental_payments").insert({ ...values, business_id: BUSINESS_ID });
-      if (error) throw error;
-      if (selectedContract) {
-        const newPaid = selectedContract.amount_paid + values.amount;
-        const newRemaining = Math.max(0, selectedContract.total_amount - newPaid);
-        let status: "PENDING" | "PARTIAL" | "FULLY_SETTLED" = "PARTIAL";
-        if (newRemaining <= 0) status = "FULLY_SETTLED";
-        await supabase.from("rental_contracts").update({ amount_paid: newPaid, remaining_amount: newRemaining, financial_status: status }).eq("id", selectedContract.id);
-      }
+      await apiRequest("POST", "/api/rental-payments", {
+        rental_contract_id: values.rental_contract_id,
+        amount: values.amount,
+        payment_date: values.payment_date,
+        mode: values.mode,
+        notes: values.notes,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/rental-contracts", direction] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rental-contracts?direction=" + direction] });
       setPaymentSuccess(true);
       setTimeout(() => {
         setPaymentSuccess(false);
@@ -288,7 +240,7 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
         <DialogContent>
           <DialogHeader><DialogTitle>Record Rental Payment</DialogTitle></DialogHeader>
           {paymentSuccess ? (
-            <div className="flex flex-col items-center justify-center py-8 animate-in fade-in zoom-in-95 duration-[400ms] ease-in-out">
+            <div className="flex flex-col items-center justify-center py-8 animate-in fade-in zoom-in-95">
               <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
                 <CreditCard className="h-8 w-8 text-green-600" />
               </div>

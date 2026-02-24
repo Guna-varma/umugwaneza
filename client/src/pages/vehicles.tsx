@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { supabase, supabasePublic } from "@/lib/supabase";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Vehicle, InsertVehicle } from "@shared/schema";
 import { insertVehicleSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,8 +17,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Truck, RefreshCw } from "lucide-react";
-
-const BUSINESS_ID = "biz_001";
 
 function statusVariant(status: string) {
   switch (status) {
@@ -38,12 +35,7 @@ export default function VehiclesPage() {
   const [syncing, setSyncing] = useState(false);
 
   const { data: vehicles, isLoading } = useQuery<Vehicle[]>({
-    queryKey: ["/vehicles"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("vehicles").select("*").eq("business_id", BUSINESS_ID).order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryKey: ["/api/vehicles"],
   });
 
   const form = useForm<InsertVehicle>({
@@ -53,11 +45,10 @@ export default function VehiclesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertVehicle) => {
-      const { error } = await supabase.from("vehicles").insert({ ...values, business_id: BUSINESS_ID });
-      if (error) throw error;
+      await apiRequest("POST", "/api/vehicles", values);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
       toast({ title: "Vehicle added successfully" });
       form.reset();
       setOpen(false);
@@ -68,46 +59,11 @@ export default function VehiclesPage() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const { data: hapyjoVehicles, error: fetchError } = await supabasePublic.from("vehicles").select("*");
-      if (fetchError) throw fetchError;
-
-      if (!hapyjoVehicles || hapyjoVehicles.length === 0) {
-        toast({ title: "No vehicles found in HAPYJO", description: "The master fleet table is empty." });
-        setSyncing(false);
-        return;
-      }
-
-      for (const hv of hapyjoVehicles) {
-        const vehicleType = (hv.type || "").toLowerCase() === "machine" ? "MACHINE" : "TRUCK";
-        const { data: existing } = await supabase
-          .from("vehicles")
-          .select("id")
-          .eq("business_id", BUSINESS_ID)
-          .eq("hapyjo_vehicle_id", String(hv.id))
-          .maybeSingle();
-
-        if (existing) {
-          await supabase.from("vehicles").update({
-            vehicle_name: hv.vehicle_number_or_id || `Vehicle ${hv.id}`,
-            vehicle_type: vehicleType,
-          }).eq("id", existing.id);
-        } else {
-          await supabase.from("vehicles").insert({
-            business_id: BUSINESS_ID,
-            hapyjo_vehicle_id: String(hv.id),
-            vehicle_name: hv.vehicle_number_or_id || `Vehicle ${hv.id}`,
-            vehicle_type: vehicleType,
-            rental_type: "DAY",
-            ownership_type: "OWN",
-            base_rate: 0,
-            current_status: "AVAILABLE",
-          });
-        }
-      }
-
-      queryClient.invalidateQueries({ queryKey: ["/vehicles"] });
-      queryClient.invalidateQueries({ queryKey: ["/dashboard/rental"] });
-      toast({ title: "Sync complete", description: `${hapyjoVehicles.length} vehicles synced from HAPYJO.` });
+      const res = await apiRequest("POST", "/api/vehicles/sync");
+      const result = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/rental"] });
+      toast({ title: "Sync complete", description: result.message || "Vehicles synced from HAPYJO." });
     } catch (e: any) {
       toast({ title: "Sync failed", description: e.message, variant: "destructive" });
     } finally {
