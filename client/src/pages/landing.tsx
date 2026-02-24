@@ -1,0 +1,101 @@
+import { useTranslation } from "react-i18next";
+import { useLocation } from "wouter";
+import { Building2, Package, Truck, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+export default function LandingPage() {
+  const { t } = useTranslation();
+  const [, setLocation] = useLocation();
+
+  return (
+    <div className="min-h-screen bg-[#f8fafc] overflow-hidden">
+      <header className="relative z-10 flex items-center justify-between px-6 py-4 md:px-12">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2563eb]">
+            <Building2 className="h-5 w-5 text-white" />
+          </div>
+          <span className="text-lg font-bold text-[#1e293b]">{t("app.name")}</span>
+        </div>
+        <Button
+          className="h-12 px-8 bg-[#2563eb] text-white transition-transform duration-200 hover:scale-[1.02] hover:brightness-95"
+          onClick={() => setLocation("/login")}
+          data-testid="button-landing-signin"
+        >
+          {t("landing.cta_signin")}
+        </Button>
+      </header>
+
+      <div className="relative">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-[#2563eb]/5 animate-landing-blob-1" />
+          <div className="absolute top-1/2 -left-32 w-[400px] h-[400px] rounded-full bg-[#2563eb]/3 animate-landing-blob-2" />
+          <div className="absolute bottom-0 right-1/4 w-[300px] h-[300px] rounded-full bg-[#1e293b]/3 animate-landing-blob-3" />
+        </div>
+
+        <div className="relative z-10 flex flex-col items-center justify-center px-6 pt-16 pb-24 md:pt-24 md:pb-32 text-center">
+          <div className="animate-landing-fade-up">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#2563eb]/10 text-[#2563eb] text-sm font-medium mb-8">
+              <Building2 className="h-4 w-4" />
+              Rwanda · B2B Platform
+            </div>
+          </div>
+
+          <h1
+            className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#1e293b] max-w-4xl leading-tight animate-landing-fade-up"
+            style={{ animationDelay: "100ms" }}
+            data-testid="text-landing-title"
+          >
+            {t("landing.hero_title")}
+          </h1>
+
+          <p
+            className="mt-6 text-lg md:text-xl text-[#64748b] max-w-2xl leading-relaxed animate-landing-fade-up"
+            style={{ animationDelay: "200ms" }}
+          >
+            {t("landing.hero_subtitle")}
+          </p>
+
+          <div
+            className="mt-10 animate-landing-fade-up"
+            style={{ animationDelay: "300ms" }}
+          >
+            <Button
+              className="h-14 px-10 text-base bg-[#2563eb] text-white transition-transform duration-200 hover:scale-[1.02] hover:brightness-95"
+              onClick={() => setLocation("/login")}
+              data-testid="button-landing-signin-hero"
+            >
+              {t("landing.cta_signin")}
+            </Button>
+          </div>
+        </div>
+
+        <div className="relative z-10 max-w-5xl mx-auto px-6 pb-24">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              { icon: Package, titleKey: "landing.feature1_title", descKey: "landing.feature1_desc", delay: "400ms" },
+              { icon: Truck, titleKey: "landing.feature2_title", descKey: "landing.feature2_desc", delay: "500ms" },
+              { icon: FileText, titleKey: "landing.feature3_title", descKey: "landing.feature3_desc", delay: "600ms" },
+            ].map((feature) => (
+              <div
+                key={feature.titleKey}
+                className="group bg-white rounded-xl border border-[#e2e8f0] p-6 transition-transform duration-200 hover:scale-[1.02] animate-landing-fade-up"
+                style={{ animationDelay: feature.delay }}
+                data-testid={`card-feature-${feature.titleKey.split(".")[1]}`}
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#2563eb]/10 mb-4">
+                  <feature.icon className="h-6 w-6 text-[#2563eb]" />
+                </div>
+                <h3 className="text-lg font-semibold text-[#1e293b] mb-2">{t(feature.titleKey)}</h3>
+                <p className="text-sm text-[#64748b] leading-relaxed">{t(feature.descKey)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <footer className="relative z-10 py-8 text-center border-t border-[#e2e8f0]">
+        <p className="text-sm text-[#64748b]">{t("app.copyright", { year: new Date().getFullYear() })}</p>
+      </footer>
+    </div>
+  );
+}

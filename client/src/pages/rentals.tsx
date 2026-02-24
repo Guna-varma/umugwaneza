@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { RentalContract, InsertRentalContract, Vehicle, Customer, ExternalAssetOwner, RentalPayment, InsertRentalPayment } from "@shared/schema";
@@ -49,6 +50,7 @@ function calculateTotal(start: string, end: string, rate: number, rentalType: st
 }
 
 export default function RentalsPage({ direction }: { direction: "OUTGOING" | "INCOMING" }) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -107,11 +109,11 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
       queryClient.invalidateQueries({ queryKey: ["/api/rental-contracts?direction=" + direction] });
       queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/rental"] });
-      toast({ title: "Rental contract created" });
+      toast({ title: t("common.rental_created") });
       form.reset({ vehicle_id: "", rental_direction: direction, customer_id: null, external_owner_id: null, rental_start_datetime: "", rental_end_datetime: "", rate: 0, location: "", notes: "" });
       setOpen(false);
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   const completeMutation = useMutation({
@@ -121,9 +123,9 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/rental-contracts?direction=" + direction] });
       queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
-      toast({ title: "Contract marked as completed" });
+      toast({ title: t("common.contract_completed") });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   const payForm = useForm<InsertRentalPayment>({
@@ -150,36 +152,36 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
         setPayOpen(false);
         setSelectedContract(null);
       }, 800);
-      toast({ title: "Payment recorded" });
+      toast({ title: t("common.payment_recorded") });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   const Icon = isOutgoing ? ArrowUpRight : ArrowDownLeft;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 animate-page-fade">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-[#1e293b]" data-testid="text-page-title">
-            {isOutgoing ? "Outgoing Rentals" : "Incoming Rentals"}
+            {isOutgoing ? t("rentals.outgoing_title") : t("rentals.incoming_title")}
           </h1>
           <p className="text-sm text-[#64748b]">
-            {isOutgoing ? "Rent out your vehicles to customers" : "Rent vehicles from external owners"}
+            {isOutgoing ? t("rentals.outgoing_subtitle") : t("rentals.incoming_subtitle")}
           </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="h-12 bg-[#2563eb]" data-testid="button-add-rental"><Plus className="h-4 w-4 mr-2" /> New Contract</Button>
+            <Button className="h-12 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]" data-testid="button-add-rental"><Plus className="h-4 w-4 mr-2" /> {t("rentals.new_contract")}</Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>New {isOutgoing ? "Outgoing" : "Incoming"} Rental</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{isOutgoing ? t("rentals.new_outgoing") : t("rentals.new_incoming")}</DialogTitle></DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-4">
                 <FormField control={form.control} name="vehicle_id" render={({ field }) => (
-                  <FormItem><FormLabel>Vehicle</FormLabel>
+                  <FormItem><FormLabel>{t("rentals.vehicle")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger data-testid="select-vehicle"><SelectValue placeholder="Select vehicle" /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger data-testid="select-vehicle"><SelectValue placeholder={t("rentals.select_vehicle")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {vehicles?.map((v) => <SelectItem key={v.id} value={v.id}>{v.vehicle_name} ({v.vehicle_type})</SelectItem>)}
                       </SelectContent>
@@ -188,9 +190,9 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
                 )} />
                 {isOutgoing ? (
                   <FormField control={form.control} name="customer_id" render={({ field }) => (
-                    <FormItem><FormLabel>Customer</FormLabel>
+                    <FormItem><FormLabel>{t("rentals.customer")}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value || ""}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger><SelectValue placeholder={t("rentals.select_customer")} /></SelectTrigger></FormControl>
                         <SelectContent>
                           {customers?.map((c) => <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>)}
                         </SelectContent>
@@ -199,9 +201,9 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
                   )} />
                 ) : (
                   <FormField control={form.control} name="external_owner_id" render={({ field }) => (
-                    <FormItem><FormLabel>External Owner</FormLabel>
+                    <FormItem><FormLabel>{t("rentals.external_owner")}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value || ""}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select owner" /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger><SelectValue placeholder={t("rentals.select_owner")} /></SelectTrigger></FormControl>
                         <SelectContent>
                           {externalOwners?.map((o) => <SelectItem key={o.id} value={o.id}>{o.owner_name}</SelectItem>)}
                         </SelectContent>
@@ -210,25 +212,25 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
                   )} />
                 )}
                 <FormField control={form.control} name="rental_start_datetime" render={({ field }) => (
-                  <FormItem><FormLabel>Start Date/Time</FormLabel><FormControl><Input type="datetime-local" {...field} data-testid="input-start" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("rentals.start_datetime")}</FormLabel><FormControl><Input type="datetime-local" {...field} data-testid="input-start" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="rental_end_datetime" render={({ field }) => (
-                  <FormItem><FormLabel>End Date/Time</FormLabel><FormControl><Input type="datetime-local" {...field} data-testid="input-end" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("rentals.end_datetime")}</FormLabel><FormControl><Input type="datetime-local" {...field} data-testid="input-end" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="rate" render={({ field }) => (
-                  <FormItem><FormLabel>Rate per {rentalType === "HOUR" ? "Hour" : "Day"} (RWF)</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-rate" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{rentalType === "HOUR" ? t("rentals.rate_per_hour") : t("rentals.rate_per_day")}</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-rate" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <div className="rounded-lg border border-[#e2e8f0] p-3 bg-[#f1f5f9]">
-                  <div className="flex justify-between text-sm"><span className="text-[#64748b]">Estimated Total</span><span className="font-semibold text-[#1e293b]">{formatRWF(autoTotal)}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#64748b]">{t("rentals.estimated_total")}</span><span className="font-semibold text-[#1e293b]">{formatRWF(autoTotal)}</span></div>
                 </div>
                 <FormField control={form.control} name="location" render={({ field }) => (
-                  <FormItem><FormLabel>Location</FormLabel><FormControl><Input {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("rentals.location")}</FormLabel><FormControl><Input {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="notes" render={({ field }) => (
-                  <FormItem><FormLabel>Notes</FormLabel><FormControl><Textarea {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("rentals.notes")}</FormLabel><FormControl><Textarea {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <Button type="submit" className="w-full h-12 bg-[#2563eb]" disabled={createMutation.isPending} data-testid="button-submit-rental">
-                  {createMutation.isPending ? "Creating..." : "Create Contract"}
+                  {createMutation.isPending ? t("rentals.creating") : t("rentals.create_contract")}
                 </Button>
               </form>
             </Form>
@@ -238,47 +240,47 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
 
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Record Rental Payment</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("rentals.record_payment")}</DialogTitle></DialogHeader>
           {paymentSuccess ? (
             <div className="flex flex-col items-center justify-center py-8 animate-in fade-in zoom-in-95">
               <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
                 <CreditCard className="h-8 w-8 text-green-600" />
               </div>
-              <p className="text-lg font-semibold text-[#1e293b]">Payment Recorded!</p>
+              <p className="text-lg font-semibold text-[#1e293b]">{t("rentals.payment_recorded")}</p>
             </div>
           ) : (
             <Form {...payForm}>
               <form onSubmit={payForm.handleSubmit((v) => payMutation.mutate(v))} className="space-y-4">
                 {selectedContract && (
                   <div className="rounded-lg border border-[#e2e8f0] p-3 bg-[#f1f5f9] text-sm space-y-1">
-                    <div className="flex justify-between"><span className="text-[#64748b]">Total</span><span className="text-[#1e293b]">{formatRWF(selectedContract.total_amount)}</span></div>
-                    <div className="flex justify-between"><span className="text-[#64748b]">Paid</span><span className="text-[#1e293b]">{formatRWF(selectedContract.amount_paid)}</span></div>
-                    <div className="flex justify-between font-medium"><span className="text-[#64748b]">Remaining</span><span className="text-[#1e293b]">{formatRWF(selectedContract.remaining_amount)}</span></div>
+                    <div className="flex justify-between"><span className="text-[#64748b]">{t("rentals.total")}</span><span className="text-[#1e293b]">{formatRWF(selectedContract.total_amount)}</span></div>
+                    <div className="flex justify-between"><span className="text-[#64748b]">{t("rentals.paid")}</span><span className="text-[#1e293b]">{formatRWF(selectedContract.amount_paid)}</span></div>
+                    <div className="flex justify-between font-medium"><span className="text-[#64748b]">{t("rentals.remaining")}</span><span className="text-[#1e293b]">{formatRWF(selectedContract.remaining_amount)}</span></div>
                   </div>
                 )}
                 <FormField control={payForm.control} name="amount" render={({ field }) => (
-                  <FormItem><FormLabel>Amount (RWF)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("rentals.amount_rwf")}</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={payForm.control} name="payment_date" render={({ field }) => (
-                  <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("rentals.date")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={payForm.control} name="mode" render={({ field }) => (
-                  <FormItem><FormLabel>Mode</FormLabel>
+                  <FormItem><FormLabel>{t("rentals.mode")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="CASH">Cash</SelectItem>
-                        <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
-                        <SelectItem value="MOBILE_MONEY">Mobile Money</SelectItem>
+                        <SelectItem value="CASH">{t("rentals.cash")}</SelectItem>
+                        <SelectItem value="BANK_TRANSFER">{t("rentals.bank_transfer")}</SelectItem>
+                        <SelectItem value="MOBILE_MONEY">{t("rentals.mobile_money")}</SelectItem>
                       </SelectContent>
                     </Select><FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={payForm.control} name="notes" render={({ field }) => (
-                  <FormItem><FormLabel>Notes</FormLabel><FormControl><Textarea {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("rentals.notes")}</FormLabel><FormControl><Textarea {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <Button type="submit" className="w-full h-12 bg-[#2563eb]" disabled={payMutation.isPending}>
-                  {payMutation.isPending ? "Processing..." : "Record Payment"}
+                  {payMutation.isPending ? t("rentals.recording") : t("rentals.record")}
                 </Button>
               </form>
             </Form>
@@ -293,28 +295,28 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
           ) : !contracts?.length ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Icon className="h-12 w-12 text-[#64748b] mb-4" />
-              <p className="text-[#1e293b] font-medium">No {isOutgoing ? "outgoing" : "incoming"} rentals yet</p>
-              <p className="text-sm text-[#64748b]">Create your first rental contract</p>
+              <p className="text-[#1e293b] font-medium">{isOutgoing ? t("rentals.no_outgoing") : t("rentals.no_incoming")}</p>
+              <p className="text-sm text-[#64748b]">{t("rentals.create_first")}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-b border-[#e2e8f0]">
-                    <TableHead className="text-[#64748b]">Vehicle</TableHead>
-                    <TableHead className="text-[#64748b]">{isOutgoing ? "Customer" : "Owner"}</TableHead>
-                    <TableHead className="text-[#64748b]">Start</TableHead>
-                    <TableHead className="text-[#64748b]">End</TableHead>
-                    <TableHead className="text-[#64748b] text-right">Total (RWF)</TableHead>
-                    <TableHead className="text-[#64748b] text-right">Paid (RWF)</TableHead>
-                    <TableHead className="text-[#64748b]">Financial</TableHead>
-                    <TableHead className="text-[#64748b]">Status</TableHead>
-                    <TableHead className="text-[#64748b]">Actions</TableHead>
+                    <TableHead className="text-[#64748b]">{t("rentals.vehicle")}</TableHead>
+                    <TableHead className="text-[#64748b]">{isOutgoing ? t("rentals.customer") : t("rentals.external_owner")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("rentals.start")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("rentals.end")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right">{t("rentals.total_rwf")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right">{t("rentals.paid_rwf")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("rentals.financial")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("rentals.status")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("rentals.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {contracts.map((c) => (
-                    <TableRow key={c.id} className="border-b border-[#e2e8f0]" data-testid={`row-rental-${c.id}`}>
+                  {contracts.map((c, i) => (
+                    <TableRow key={c.id} className="border-b border-[#e2e8f0] animate-row-slide" style={{ animationDelay: `${i * 30}ms` }} data-testid={`row-rental-${c.id}`}>
                       <TableCell className="font-medium text-[#1e293b]">{c.vehicle?.vehicle_name || "—"}</TableCell>
                       <TableCell className="text-[#64748b]">{isOutgoing ? c.customer?.customer_name : c.external_owner?.owner_name || "—"}</TableCell>
                       <TableCell className="text-[#64748b] text-xs">{new Date(c.rental_start_datetime).toLocaleString()}</TableCell>
@@ -330,10 +332,10 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
                               setSelectedContract(c);
                               payForm.reset({ rental_contract_id: c.id, amount: 0, payment_date: new Date().toISOString().split("T")[0], mode: "CASH", notes: "" });
                               setPayOpen(true);
-                            }} data-testid={`button-pay-${c.id}`}>Pay</Button>
+                            }} data-testid={`button-pay-${c.id}`}>{t("rentals.pay")}</Button>
                           )}
                           {c.operational_status === "ACTIVE" && (
-                            <Button variant="outline" size="sm" onClick={() => completeMutation.mutate(c)} data-testid={`button-complete-${c.id}`}>Complete</Button>
+                            <Button variant="outline" size="sm" onClick={() => completeMutation.mutate(c)} data-testid={`button-complete-${c.id}`}>{t("rentals.complete")}</Button>
                           )}
                         </div>
                       </TableCell>

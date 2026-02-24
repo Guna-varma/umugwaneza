@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ type ReportRow = {
 };
 
 export default function ReportsPage() {
+  const { t } = useTranslation();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
 
   const { data: reportData, isLoading } = useQuery<{ rows: ReportRow[]; totalPurchase: number; totalSales: number; totalRentalRevenue: number; totalRentalCost: number; netProfit: number }>({
@@ -34,18 +36,18 @@ export default function ReportsPage() {
 
   const downloadCSV = () => {
     if (!reportData) return;
-    const headers = ["Date", "Type", "Reference", "Party", "Item/Vehicle", "Quantity", "Total Amount (RWF)", "Paid (RWF)", "Remaining (RWF)", "Status"];
+    const headers = [t("reports.date"), t("reports.type"), t("reports.reference"), t("reports.party"), t("reports.item_vehicle"), t("reports.quantity"), t("reports.total_rwf"), t("reports.paid_rwf"), t("reports.remaining_rwf"), t("reports.status")];
     const csvRows = [headers.join(",")];
     for (const r of reportData.rows) {
       csvRows.push([selectedDate, r.type, r.reference, `"${r.party}"`, `"${r.item_vehicle}"`, `"${r.quantity}"`, r.total, r.paid, r.remaining, r.status].join(","));
     }
     csvRows.push("");
-    csvRows.push(["", "", "", "", "", "TOTAL", "", "", "", ""].join(","));
-    csvRows.push(["", "Total Purchase", "", "", "", "", reportData.totalPurchase, "", "", ""].join(","));
-    csvRows.push(["", "Total Sales", "", "", "", "", reportData.totalSales, "", "", ""].join(","));
-    csvRows.push(["", "Total Rental Revenue", "", "", "", "", reportData.totalRentalRevenue, "", "", ""].join(","));
-    csvRows.push(["", "Total Rental Cost", "", "", "", "", reportData.totalRentalCost, "", "", ""].join(","));
-    csvRows.push(["", "Net Profit", "", "", "", "", reportData.netProfit, "", "", ""].join(","));
+    csvRows.push(["", "", "", "", "", t("reports.totals"), "", "", "", ""].join(","));
+    csvRows.push(["", t("reports.total_purchases"), "", "", "", "", reportData.totalPurchase, "", "", ""].join(","));
+    csvRows.push(["", t("reports.total_sales"), "", "", "", "", reportData.totalSales, "", "", ""].join(","));
+    csvRows.push(["", t("reports.total_rental_revenue"), "", "", "", "", reportData.totalRentalRevenue, "", "", ""].join(","));
+    csvRows.push(["", t("reports.total_rental_cost"), "", "", "", "", reportData.totalRentalCost, "", "", ""].join(","));
+    csvRows.push(["", t("reports.net_profit"), "", "", "", "", reportData.netProfit, "", "", ""].join(","));
 
     const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -57,15 +59,15 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 animate-page-fade">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-[#1e293b]" data-testid="text-page-title">Daily Unified Report</h1>
-          <p className="text-sm text-[#64748b]">View daily summary of all business activities</p>
+          <h1 className="text-2xl font-bold text-[#1e293b]" data-testid="text-page-title">{t("reports.title")}</h1>
+          <p className="text-sm text-[#64748b]">{t("reports.subtitle")}</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <Label className="text-sm text-[#64748b]">Date:</Label>
+            <Label className="text-sm text-[#64748b]">{t("reports.date")}:</Label>
             <Input
               type="date"
               value={selectedDate}
@@ -75,7 +77,7 @@ export default function ReportsPage() {
             />
           </div>
           <Button variant="outline" className="h-12 border-[#e2e8f0]" onClick={downloadCSV} disabled={!reportData?.rows.length} data-testid="button-download-csv">
-            <Download className="h-4 w-4 mr-2" /> Download CSV
+            <Download className="h-4 w-4 mr-2" /> {t("reports.download_csv")}
           </Button>
         </div>
       </div>
@@ -87,29 +89,29 @@ export default function ReportsPage() {
           ) : !reportData?.rows.length ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <FileText className="h-12 w-12 text-[#64748b] mb-4" />
-              <p className="text-[#1e293b] font-medium">No data for this date</p>
-              <p className="text-sm text-[#64748b]">Select a different date or add transactions</p>
+              <p className="text-[#1e293b] font-medium">{t("reports.no_data")}</p>
+              <p className="text-sm text-[#64748b]">{t("reports.select_different_date")}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-b border-[#e2e8f0]">
-                    <TableHead className="text-[#64748b]">Date</TableHead>
-                    <TableHead className="text-[#64748b]">Type</TableHead>
-                    <TableHead className="text-[#64748b]">Reference</TableHead>
-                    <TableHead className="text-[#64748b]">Party</TableHead>
-                    <TableHead className="text-[#64748b]">Item/Vehicle</TableHead>
-                    <TableHead className="text-[#64748b]">Quantity</TableHead>
-                    <TableHead className="text-[#64748b] text-right">Total (RWF)</TableHead>
-                    <TableHead className="text-[#64748b] text-right">Paid (RWF)</TableHead>
-                    <TableHead className="text-[#64748b] text-right">Remaining (RWF)</TableHead>
-                    <TableHead className="text-[#64748b]">Status</TableHead>
+                    <TableHead className="text-[#64748b]">{t("reports.date")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("reports.type")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("reports.reference")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("reports.party")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("reports.item_vehicle")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("reports.quantity")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right">{t("reports.total_rwf")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right">{t("reports.paid_rwf")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right">{t("reports.remaining_rwf")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("reports.status")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {reportData.rows.map((r, i) => (
-                    <TableRow key={i} className="border-b border-[#e2e8f0]">
+                    <TableRow key={i} className="border-b border-[#e2e8f0] animate-row-slide" style={{ animationDelay: `${i * 30}ms` }}>
                       <TableCell className="text-[#64748b]">{selectedDate}</TableCell>
                       <TableCell><Badge variant="secondary">{r.type}</Badge></TableCell>
                       <TableCell className="font-mono text-xs text-[#1e293b]">{r.reference}</TableCell>
@@ -123,31 +125,31 @@ export default function ReportsPage() {
                     </TableRow>
                   ))}
                   <TableRow className="bg-[#f1f5f9] font-bold border-t-2 border-[#e2e8f0]">
-                    <TableCell colSpan={6} className="text-[#1e293b]">TOTALS</TableCell>
+                    <TableCell colSpan={6} className="text-[#1e293b]">{t("reports.totals")}</TableCell>
                     <TableCell colSpan={4} className="text-right text-[#1e293b]"></TableCell>
                   </TableRow>
                   <TableRow className="bg-[#f1f5f9]">
-                    <TableCell colSpan={6} className="text-[#64748b] font-medium">Total Purchases</TableCell>
+                    <TableCell colSpan={6} className="text-[#64748b] font-medium">{t("reports.total_purchases")}</TableCell>
                     <TableCell className="text-right font-bold text-[#1e293b]">{formatRWF(reportData.totalPurchase)}</TableCell>
                     <TableCell colSpan={3}></TableCell>
                   </TableRow>
                   <TableRow className="bg-[#f1f5f9]">
-                    <TableCell colSpan={6} className="text-[#64748b] font-medium">Total Sales</TableCell>
+                    <TableCell colSpan={6} className="text-[#64748b] font-medium">{t("reports.total_sales")}</TableCell>
                     <TableCell className="text-right font-bold text-[#1e293b]">{formatRWF(reportData.totalSales)}</TableCell>
                     <TableCell colSpan={3}></TableCell>
                   </TableRow>
                   <TableRow className="bg-[#f1f5f9]">
-                    <TableCell colSpan={6} className="text-[#64748b] font-medium">Total Rental Revenue</TableCell>
+                    <TableCell colSpan={6} className="text-[#64748b] font-medium">{t("reports.total_rental_revenue")}</TableCell>
                     <TableCell className="text-right font-bold text-[#1e293b]">{formatRWF(reportData.totalRentalRevenue)}</TableCell>
                     <TableCell colSpan={3}></TableCell>
                   </TableRow>
                   <TableRow className="bg-[#f1f5f9]">
-                    <TableCell colSpan={6} className="text-[#64748b] font-medium">Total Rental Cost</TableCell>
+                    <TableCell colSpan={6} className="text-[#64748b] font-medium">{t("reports.total_rental_cost")}</TableCell>
                     <TableCell className="text-right font-bold text-[#1e293b]">{formatRWF(reportData.totalRentalCost)}</TableCell>
                     <TableCell colSpan={3}></TableCell>
                   </TableRow>
                   <TableRow className="bg-[#f1f5f9] border-t-2 border-[#e2e8f0]">
-                    <TableCell colSpan={6} className="text-[#1e293b] font-bold text-base">Net Profit</TableCell>
+                    <TableCell colSpan={6} className="text-[#1e293b] font-bold text-base">{t("reports.net_profit")}</TableCell>
                     <TableCell className="text-right font-bold text-base text-[#1e293b]">{formatRWF(reportData.netProfit)}</TableCell>
                     <TableCell colSpan={3}></TableCell>
                   </TableRow>

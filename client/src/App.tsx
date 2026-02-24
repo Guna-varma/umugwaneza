@@ -1,4 +1,4 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,8 +7,11 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import "@/lib/i18n";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
+import LandingPage from "@/pages/landing";
 import { initializeApp } from "@/lib/init";
 import DashboardPage from "@/pages/dashboard";
 import ItemsPage from "@/pages/items";
@@ -23,6 +26,7 @@ import RentalsPage from "@/pages/rentals";
 import ReportsPage from "@/pages/reports";
 import AdminBusinessesPage from "@/pages/admin-businesses";
 import AdminOwnersPage from "@/pages/admin-owners";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 function OwnerRouter() {
   return (
@@ -58,6 +62,7 @@ function AdminRouter() {
 
 function AuthenticatedLayout() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const isAdmin = user?.role === "SYSTEM_ADMIN";
 
   const style = {
@@ -73,11 +78,14 @@ function AuthenticatedLayout() {
           <header className="flex items-center justify-between gap-2 px-4 py-3 border-b border-[#e2e8f0] bg-white">
             <div className="flex items-center gap-3">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
-              <span className="text-sm font-medium text-[#1e293b]">UMUGWANEZA LTD</span>
+              <span className="text-sm font-medium text-[#1e293b]">{t("app.name")}</span>
             </div>
+            <LanguageSwitcher />
           </header>
           <main className="flex-1 overflow-auto">
-            {isAdmin ? <AdminRouter /> : <OwnerRouter />}
+            <div className="animate-page-fade">
+              {isAdmin ? <AdminRouter /> : <OwnerRouter />}
+            </div>
           </main>
         </div>
       </div>
@@ -87,6 +95,7 @@ function AuthenticatedLayout() {
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
+  const [location] = useLocation();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -95,7 +104,15 @@ function AppContent() {
   }, [isAuthenticated]);
 
   if (!isAuthenticated) {
-    return <LoginPage />;
+    if (location === "/login") {
+      return <LoginPage />;
+    }
+    return (
+      <Switch>
+        <Route path="/login" component={LoginPage} />
+        <Route component={LandingPage} />
+      </Switch>
+    );
   }
 
   return <AuthenticatedLayout />;

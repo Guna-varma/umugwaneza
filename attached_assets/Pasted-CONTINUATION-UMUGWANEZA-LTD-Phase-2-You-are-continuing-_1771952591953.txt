@@ -1,0 +1,77 @@
+CONTINUATION: UMUGWANEZA LTD – Phase 2
+
+You are continuing the existing UMUGWANEZA LTD B2B web app (React + Vite + TypeScript, Supabase same DB as HAPYJO). Do NOT change tech stack or auth (dummy login stays). Apply the following in order.
+
+=========================================
+1. LANDING PAGE (NEW ENTRY POINT)
+=========================================
+
+- First screen users see: a single, striking ANIMATED LANDING PAGE (no dashboard, no sidebar).
+- Only one visible CTA at top: "Sign in" (or "Sign In"). No other nav links on this page.
+- On click "Sign in" → redirect to the existing sign-in page (login).
+- Landing must feel premium and “mind‑boggling” but still classic/corporate: subtle motion (e.g. gentle fade-in, soft parallax, or slow gradient shift). NO glassmorphism, NO neon, NO confetti. Keep colors: #f8fafc, #2563eb, #1e293b.
+- After successful login → redirect to Dashboard as now.
+
+=========================================
+2. INTERNATIONALIZATION (i18n) – LIVE TRANSLATION
+=========================================
+
+- Support two languages: English (default) and Kinyarwanda (Rwanda).
+- All user-facing text MUST come from translation keys. NO hardcoded English or Kinyarwanda in components.
+- Use a proper i18n approach (e.g. react-i18next or similar): JSON/JS files for en and rw (e.g. locales/en.json, locales/rw.json). Default language = English.
+- Provide a language switcher (e.g. in header/sidebar): "EN" | "RW". On switch, entire app updates immediately (no reload if possible).
+- Every label, button, table header, message, validation text must use t('key'). Add keys for: login, dashboard, items, suppliers, customers, purchases, sales, payments, vehicles, external owners, rentals, reports, sync, errors, success messages, etc.
+
+=========================================
+3. DUMMY DATA – REALISTIC AFRICAN / RWANDA CONTEXT
+=========================================
+
+- Replace generic dummy data with realistic African/Rwanda-oriented data inside the umugwaneza schema (same DB).
+- Business: e.g. "UMUGWANEZA LTD" (or existing biz_001 name), Rwanda, RWF.
+- Suppliers: 3–5 names like Rwandan wholesalers/cooperatives (e.g. Kigali-based, upcountry).
+- Customers: 3–5 names like local shops, markets, or vendors (Rwanda-style names/places).
+- Items: 5–7 grocery items typical for wholesale in Rwanda (e.g. maize, beans, rice, cooking oil, sugar, salt – in KG or LITRE as per schema).
+- Vehicles: MUST align with Hapyjo Android app.
+  - Sync from public.vehicles (HAPYJO) into umugwaneza.vehicles (or fleet_vehicles if that’s what you use) with hapyjo_vehicle_id mapping.
+  - Seed/ensure real-time match: same vehicles that exist in the Android app (public.vehicles) appear in the website after “Sync vehicles”. If public.vehicles already has rows (from Hapyjo), use those IDs and names; do not invent conflicting IDs.
+- External asset owners: 2–3 names (Rwanda-style).
+- Purchases / Sales: 2–3 entries each with the above items/suppliers/customers, RWF amounts, recent dates.
+- Rental contracts: 2 entries (1 outgoing, 1 incoming if possible) using the synced vehicles and customers/external owners.
+- All data must use business_id = 'biz_001' (or your actual business id). No hardcoded “Test” or “Sample” in visible names; use plausible Rwandan context.
+
+=========================================
+4. UI/UX – CLASSIC, COMPLETE, ANIMATIONS
+=========================================
+
+- Style: Classic corporate financial software. Same as Android app spirit but for web: clean tables, clear hierarchy, readable typography.
+- Animations (subtle only):
+  - Page transitions: short fade (200–300ms).
+  - Lists/tables: optional light stagger on load (e.g. rows fade-in).
+  - Payment success: keep existing “fade + scale” 400ms ease-in-out, no popups/confetti/sound.
+  - Buttons: subtle hover state (e.g. slight darken or scale 1.02), no glow.
+- Ensure every built module is fully usable: Dashboard, Items, Suppliers, Customers, Purchases, Sales, Payments, Vehicles, External Owners, Outgoing/Incoming Rentals, Reports, Vehicle Sync. No broken links or empty states without a clear “Add first X” message.
+- Tables: clear headers, TOTAL row with background #f1f5f9, 8px radius, 48px button height, borders #e2e8f0. Mobile responsive where possible.
+
+=========================================
+5. VEHICLE MATCH WITH HAPYJO ANDROID APP
+=========================================
+
+- Website vehicles list must reflect the same fleet as in the Hapyjo Android app.
+- Use public.vehicles as source of truth for “master fleet”. Sync into umugwaneza.vehicles (or fleet_vehicles) with:
+  - public.vehicles.id → hapyjo_vehicle_id
+  - public.vehicles.vehicle_number_or_id → vehicle_name
+  - public.vehicles.type → vehicle_type (truck → TRUCK, machine → MACHINE)
+- “Sync vehicles” button: fetch all from public.vehicles, upsert into umugwaneza table for business_id = 'biz_001'. After sync, show count or “Synced N vehicles”.
+- Do not create fake vehicle IDs that don’t exist in public.vehicles; seed public.vehicles with a few test rows if the DB is empty, then sync so website and app stay aligned.
+
+=========================================
+6. DELIVERABLES CHECKLIST
+=========================================
+
+- [ ] Animated landing page as first screen; only “Sign in” at top → sign-in page.
+- [ ] i18n: English (default) + Kinyarwanda; all text via t('key'); language switcher; no hardcoded strings.
+- [ ] Dummy data replaced with realistic Rwanda/African data; vehicles matched to public.vehicles (Hapyjo).
+- [ ] All modules working end-to-end with classic UI and subtle animations.
+- [ ] Vehicle sync working and showing same fleet as Android app.
+
+Implement fully. END.

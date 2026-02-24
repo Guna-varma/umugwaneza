@@ -25,31 +25,38 @@ export async function registerRoutes(
       await supabase.from("businesses").insert({ id: BUSINESS_ID, name: "UMUGWANEZA LTD", currency: "RWF" });
 
       const suppliers = [
-        { business_id: BUSINESS_ID, supplier_name: "Kigali Rice Suppliers", phone: "+250788100001", address: "Kigali, Nyarugenge", notes: "Premium rice distributor" },
-        { business_id: BUSINESS_ID, supplier_name: "Rwanda Sugar Co.", phone: "+250788100002", address: "Kamonyi, Southern Province", notes: "Sugar wholesale" },
-        { business_id: BUSINESS_ID, supplier_name: "Great Lakes Oil Ltd", phone: "+250788100003", address: "Rubavu, Western Province", notes: "Cooking oil supplier" },
+        { business_id: BUSINESS_ID, supplier_name: "COPRIMU Cooperative", phone: "+250788100001", address: "Muhanga, Southern Province", notes: "Maize and beans cooperative" },
+        { business_id: BUSINESS_ID, supplier_name: "Kigali Grain Traders", phone: "+250788100002", address: "Kigali, Nyarugenge", notes: "Premium rice and wheat flour distributor" },
+        { business_id: BUSINESS_ID, supplier_name: "Inyange Industries", phone: "+250788100003", address: "Kigali, Masaka", notes: "Cooking oil and dairy wholesale" },
+        { business_id: BUSINESS_ID, supplier_name: "MINIMEX Rwanda", phone: "+250788100004", address: "Kigali, Special Economic Zone", notes: "Flour milling and salt" },
+        { business_id: BUSINESS_ID, supplier_name: "Rubavu Lake Trading", phone: "+250788100005", address: "Rubavu, Western Province", notes: "Sugar and salt from upcountry" },
       ];
       const { data: suppliersData } = await supabase.from("suppliers").insert(suppliers).select("id");
 
       const customers = [
-        { business_id: BUSINESS_ID, customer_name: "Hotel des Mille Collines", phone: "+250788200001", address: "Kigali CBD", notes: "Hotel chain" },
-        { business_id: BUSINESS_ID, customer_name: "Nakumatt Supermarket", phone: "+250788200002", address: "Kigali, Kicukiro", notes: "Retail chain" },
-        { business_id: BUSINESS_ID, customer_name: "Bourbon Coffee", phone: "+250788200003", address: "Kigali, Kimihurura", notes: "Coffee shop chain" },
+        { business_id: BUSINESS_ID, customer_name: "Marché de Kimironko", phone: "+250788200001", address: "Kigali, Kimironko", notes: "Large retail market" },
+        { business_id: BUSINESS_ID, customer_name: "Simba Supermarket", phone: "+250788200002", address: "Kigali, Kicukiro", notes: "Supermarket chain" },
+        { business_id: BUSINESS_ID, customer_name: "Musanze Fresh Foods", phone: "+250788200003", address: "Musanze, Northern Province", notes: "Regional food distributor" },
+        { business_id: BUSINESS_ID, customer_name: "Huye Market Vendors Assoc.", phone: "+250788200004", address: "Huye, Southern Province", notes: "Market vendors association" },
+        { business_id: BUSINESS_ID, customer_name: "Hotel Gorillas Kigali", phone: "+250788200005", address: "Kigali, Nyarutarama", notes: "Hospitality client" },
       ];
       const { data: customersData } = await supabase.from("customers").insert(customers).select("id");
 
       const items = [
-        { business_id: BUSINESS_ID, item_name: "Rice (Basmati)", measurement_type: "WEIGHT", base_unit: "KG", is_active: true },
-        { business_id: BUSINESS_ID, item_name: "Sugar", measurement_type: "WEIGHT", base_unit: "KG", is_active: true },
-        { business_id: BUSINESS_ID, item_name: "Cooking Oil", measurement_type: "VOLUME", base_unit: "LITRE", is_active: true },
-        { business_id: BUSINESS_ID, item_name: "Wheat Flour", measurement_type: "WEIGHT", base_unit: "KG", is_active: true },
-        { business_id: BUSINESS_ID, item_name: "Salt", measurement_type: "WEIGHT", base_unit: "KG", is_active: true },
+        { business_id: BUSINESS_ID, item_name: "Umuceri (Rice)", measurement_type: "WEIGHT", base_unit: "KG", is_active: true },
+        { business_id: BUSINESS_ID, item_name: "Ibishyimbo (Beans)", measurement_type: "WEIGHT", base_unit: "KG", is_active: true },
+        { business_id: BUSINESS_ID, item_name: "Ibigori (Maize)", measurement_type: "WEIGHT", base_unit: "KG", is_active: true },
+        { business_id: BUSINESS_ID, item_name: "Amavuta y'igikoni (Cooking Oil)", measurement_type: "VOLUME", base_unit: "LITRE", is_active: true },
+        { business_id: BUSINESS_ID, item_name: "Isukari (Sugar)", measurement_type: "WEIGHT", base_unit: "KG", is_active: true },
+        { business_id: BUSINESS_ID, item_name: "Umunyu (Salt)", measurement_type: "WEIGHT", base_unit: "KG", is_active: true },
+        { business_id: BUSINESS_ID, item_name: "Ifu y'ingano (Wheat Flour)", measurement_type: "WEIGHT", base_unit: "KG", is_active: true },
       ];
       const { data: itemsData } = await supabase.from("items").insert(items).select("id");
 
       const extOwners = [
         { business_id: BUSINESS_ID, owner_name: "Jean-Pierre HABIMANA", phone: "+250788300001", address: "Huye, Southern Province", notes: "Owns 2 excavators" },
         { business_id: BUSINESS_ID, owner_name: "Marie Claire UWIMANA", phone: "+250788300002", address: "Musanze, Northern Province", notes: "Truck fleet owner" },
+        { business_id: BUSINESS_ID, owner_name: "Emmanuel NSABIMANA", phone: "+250788300003", address: "Rubavu, Western Province", notes: "Heavy machinery operator" },
       ];
       const { data: extOwnersData } = await supabase.from("external_asset_owners").insert(extOwners).select("id");
 
@@ -120,8 +127,8 @@ export async function registerRoutes(
         const startDate = new Date();
         const endDate = new Date(startDate.getTime() + 5 * 24 * 60 * 60 * 1000);
         await supabase.from("rental_contracts").insert([
-          { business_id: BUSINESS_ID, vehicle_id: vehiclesData[0].id, rental_direction: "OUTGOING", customer_id: customersData[0].id, rental_start_datetime: startDate.toISOString(), rental_end_datetime: endDate.toISOString(), rate: 150000, total_amount: 750000, amount_paid: 300000, remaining_amount: 450000, financial_status: "PARTIAL", operational_status: "ACTIVE", location: "Kigali Construction Site" },
-          { business_id: BUSINESS_ID, vehicle_id: vehiclesData[1].id, rental_direction: "INCOMING", external_owner_id: extOwnersData[0].id, rental_start_datetime: startDate.toISOString(), rental_end_datetime: endDate.toISOString(), rate: 200000, total_amount: 1000000, amount_paid: 500000, remaining_amount: 500000, financial_status: "PARTIAL", operational_status: "ACTIVE", location: "Huye Road Project" },
+          { business_id: BUSINESS_ID, vehicle_id: vehiclesData[0].id, rental_direction: "OUTGOING", customer_id: customersData[0].id, rental_start_datetime: startDate.toISOString(), rental_end_datetime: endDate.toISOString(), rate: 150000, total_amount: 750000, amount_paid: 300000, remaining_amount: 450000, financial_status: "PARTIAL", operational_status: "ACTIVE", location: "Nyamirambo Road Expansion" },
+          { business_id: BUSINESS_ID, vehicle_id: vehiclesData[1].id, rental_direction: "INCOMING", external_owner_id: extOwnersData[0].id, rental_start_datetime: startDate.toISOString(), rental_end_datetime: endDate.toISOString(), rate: 200000, total_amount: 1000000, amount_paid: 500000, remaining_amount: 500000, financial_status: "PARTIAL", operational_status: "ACTIVE", location: "Huye-Muhanga Highway Project" },
         ]);
         await supabase.from("fleet_vehicles").update({ current_status: "RENTED_OUT" }).eq("id", vehiclesData[0].id);
         await supabase.from("fleet_vehicles").update({ current_status: "RENTED_IN" }).eq("id", vehiclesData[1].id);

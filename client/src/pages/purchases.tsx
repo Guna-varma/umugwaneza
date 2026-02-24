@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Purchase, InsertPurchase, Supplier, Item } from "@shared/schema";
@@ -28,6 +29,7 @@ function statusColor(status: string) {
 }
 
 export default function PurchasesPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
 
@@ -69,33 +71,33 @@ export default function PurchasesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/grocery"] });
-      toast({ title: "Purchase recorded successfully" });
+      toast({ title: t("common.purchase_recorded") });
       form.reset();
       setOpen(false);
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 animate-page-fade">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-[#1e293b]" data-testid="text-page-title">Purchases</h1>
-          <p className="text-sm text-[#64748b]">Track and manage your grocery purchases</p>
+          <h1 className="text-2xl font-bold text-[#1e293b]" data-testid="text-page-title">{t("purchases.title")}</h1>
+          <p className="text-sm text-[#64748b]">{t("purchases.subtitle")}</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="h-12 bg-[#2563eb]" data-testid="button-add-purchase"><Plus className="h-4 w-4 mr-2" /> New Purchase</Button>
+            <Button className="h-12 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]" data-testid="button-add-purchase"><Plus className="h-4 w-4 mr-2" /> {t("purchases.new_purchase")}</Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Record Purchase</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t("purchases.record_purchase")}</DialogTitle></DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-4">
                 <FormField control={form.control} name="supplier_id" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Supplier</FormLabel>
+                    <FormLabel>{t("purchases.supplier")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger data-testid="select-supplier"><SelectValue placeholder="Select supplier" /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger data-testid="select-supplier"><SelectValue placeholder={t("purchases.select_supplier")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {suppliers?.map((s) => <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>)}
                       </SelectContent>
@@ -105,9 +107,9 @@ export default function PurchasesPage() {
                 )} />
                 <FormField control={form.control} name="item_id" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Item</FormLabel>
+                    <FormLabel>{t("purchases.item")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger data-testid="select-item"><SelectValue placeholder="Select item" /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger data-testid="select-item"><SelectValue placeholder={t("purchases.select_item")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {items?.map((it) => <SelectItem key={it.id} value={it.id}>{it.item_name}</SelectItem>)}
                       </SelectContent>
@@ -116,30 +118,30 @@ export default function PurchasesPage() {
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="purchase_date" render={({ field }) => (
-                  <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} data-testid="input-purchase-date" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("purchases.date")}</FormLabel><FormControl><Input type="date" {...field} data-testid="input-purchase-date" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="total_quantity" render={({ field }) => (
-                    <FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-quantity" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>{t("purchases.quantity")}</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-quantity" /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="unit" render={({ field }) => (
-                    <FormItem><FormLabel>Unit</FormLabel><FormControl><Input {...field} data-testid="input-unit" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>{t("purchases.unit")}</FormLabel><FormControl><Input {...field} data-testid="input-unit" /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
                 <FormField control={form.control} name="unit_price" render={({ field }) => (
-                  <FormItem><FormLabel>Unit Price (RWF)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-unit-price" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("purchases.unit_price")}</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-unit-price" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <div className="rounded-lg border border-[#e2e8f0] p-3 bg-[#f1f5f9]">
-                  <div className="flex justify-between text-sm"><span className="text-[#64748b]">Total Cost</span><span className="font-semibold text-[#1e293b]">{formatRWF(totalCost)}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#64748b]">{t("purchases.total_cost")}</span><span className="font-semibold text-[#1e293b]">{formatRWF(totalCost)}</span></div>
                 </div>
                 <FormField control={form.control} name="amount_paid" render={({ field }) => (
-                  <FormItem><FormLabel>Amount Paid (RWF)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-amount-paid" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("purchases.amount_paid")}</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-amount-paid" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <div className="rounded-lg border border-[#e2e8f0] p-3 bg-[#f1f5f9]">
-                  <div className="flex justify-between text-sm"><span className="text-[#64748b]">Remaining</span><span className="font-semibold text-[#1e293b]">{formatRWF(Math.max(0, remaining))}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#64748b]">{t("purchases.remaining")}</span><span className="font-semibold text-[#1e293b]">{formatRWF(Math.max(0, remaining))}</span></div>
                 </div>
-                <Button type="submit" className="w-full h-12 bg-[#2563eb]" disabled={createMutation.isPending} data-testid="button-submit-purchase">
-                  {createMutation.isPending ? "Saving..." : "Record Purchase"}
+                <Button type="submit" className="w-full h-12 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]" disabled={createMutation.isPending} data-testid="button-submit-purchase">
+                  {createMutation.isPending ? t("purchases.saving") : t("purchases.record")}
                 </Button>
               </form>
             </Form>
@@ -154,28 +156,28 @@ export default function PurchasesPage() {
           ) : !purchases?.length ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <ShoppingCart className="h-12 w-12 text-[#64748b] mb-4" />
-              <p className="text-[#1e293b] font-medium">No purchases yet</p>
-              <p className="text-sm text-[#64748b]">Record your first purchase</p>
+              <p className="text-[#1e293b] font-medium">{t("purchases.no_purchases")}</p>
+              <p className="text-sm text-[#64748b]">{t("purchases.add_first")}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-b border-[#e2e8f0]">
-                    <TableHead className="text-[#64748b]">Ref</TableHead>
-                    <TableHead className="text-[#64748b]">Date</TableHead>
-                    <TableHead className="text-[#64748b]">Supplier</TableHead>
-                    <TableHead className="text-[#64748b]">Item</TableHead>
-                    <TableHead className="text-[#64748b] text-right">Qty</TableHead>
-                    <TableHead className="text-[#64748b] text-right">Total (RWF)</TableHead>
-                    <TableHead className="text-[#64748b] text-right">Paid (RWF)</TableHead>
-                    <TableHead className="text-[#64748b] text-right">Remaining (RWF)</TableHead>
-                    <TableHead className="text-[#64748b]">Status</TableHead>
+                    <TableHead className="text-[#64748b]">{t("purchases.ref")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("purchases.date")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("purchases.supplier")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("purchases.item")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right">{t("purchases.quantity")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right">{t("purchases.total_rwf")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right">{t("purchases.paid_rwf")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right">{t("purchases.remaining_rwf")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("common.status")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {purchases.map((p) => (
-                    <TableRow key={p.id} className="border-b border-[#e2e8f0]" data-testid={`row-purchase-${p.id}`}>
+                  {purchases.map((p, i) => (
+                    <TableRow key={p.id} className="border-b border-[#e2e8f0] animate-row-slide" style={{ animationDelay: `${i * 30}ms` }} data-testid={`row-purchase-${p.id}`}>
                       <TableCell className="font-mono text-xs text-[#1e293b]">{p.reference_no}</TableCell>
                       <TableCell className="text-[#64748b]">{p.purchase_date}</TableCell>
                       <TableCell className="text-[#1e293b]">{p.supplier?.supplier_name || "—"}</TableCell>

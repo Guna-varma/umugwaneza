@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Sale, InsertSale, Customer, Item } from "@shared/schema";
@@ -28,6 +29,7 @@ function statusColor(status: string) {
 }
 
 export default function SalesPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
 
@@ -69,33 +71,33 @@ export default function SalesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/grocery"] });
-      toast({ title: "Sale recorded successfully" });
+      toast({ title: t("common.sale_recorded") });
       form.reset();
       setOpen(false);
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 animate-page-fade">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-[#1e293b]" data-testid="text-page-title">Sales</h1>
-          <p className="text-sm text-[#64748b]">Track and manage your sales</p>
+          <h1 className="text-2xl font-bold text-[#1e293b]" data-testid="text-page-title">{t("sales.title")}</h1>
+          <p className="text-sm text-[#64748b]">{t("sales.subtitle")}</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="h-12 bg-[#2563eb]" data-testid="button-add-sale"><Plus className="h-4 w-4 mr-2" /> New Sale</Button>
+            <Button className="h-12 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]" data-testid="button-add-sale"><Plus className="h-4 w-4 mr-2" /> {t("sales.new_sale")}</Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Record Sale</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t("sales.record_sale")}</DialogTitle></DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-4">
                 <FormField control={form.control} name="customer_id" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Customer</FormLabel>
+                    <FormLabel>{t("sales.customer")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger data-testid="select-customer"><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger data-testid="select-customer"><SelectValue placeholder={t("sales.select_customer")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {customers?.map((c) => <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>)}
                       </SelectContent>
@@ -105,9 +107,9 @@ export default function SalesPage() {
                 )} />
                 <FormField control={form.control} name="item_id" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Item</FormLabel>
+                    <FormLabel>{t("sales.item")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger data-testid="select-item"><SelectValue placeholder="Select item" /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger data-testid="select-item"><SelectValue placeholder={t("sales.select_item")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {items?.map((it) => <SelectItem key={it.id} value={it.id}>{it.item_name}</SelectItem>)}
                       </SelectContent>
@@ -116,30 +118,30 @@ export default function SalesPage() {
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="sale_date" render={({ field }) => (
-                  <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} data-testid="input-sale-date" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("sales.date")}</FormLabel><FormControl><Input type="date" {...field} data-testid="input-sale-date" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="total_quantity" render={({ field }) => (
-                    <FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-quantity" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>{t("sales.quantity")}</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-quantity" /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="unit" render={({ field }) => (
-                    <FormItem><FormLabel>Unit</FormLabel><FormControl><Input {...field} data-testid="input-unit" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>{t("sales.unit")}</FormLabel><FormControl><Input {...field} data-testid="input-unit" /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
                 <FormField control={form.control} name="unit_price" render={({ field }) => (
-                  <FormItem><FormLabel>Unit Price (RWF)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-unit-price" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("sales.unit_price")}</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-unit-price" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <div className="rounded-lg border border-[#e2e8f0] p-3 bg-[#f1f5f9]">
-                  <div className="flex justify-between text-sm"><span className="text-[#64748b]">Total Amount</span><span className="font-semibold text-[#1e293b]">{formatRWF(totalAmount)}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#64748b]">{t("sales.total_amount")}</span><span className="font-semibold text-[#1e293b]">{formatRWF(totalAmount)}</span></div>
                 </div>
                 <FormField control={form.control} name="amount_received" render={({ field }) => (
-                  <FormItem><FormLabel>Amount Received (RWF)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-amount-received" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("sales.amount_received")}</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-amount-received" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <div className="rounded-lg border border-[#e2e8f0] p-3 bg-[#f1f5f9]">
-                  <div className="flex justify-between text-sm"><span className="text-[#64748b]">Remaining</span><span className="font-semibold text-[#1e293b]">{formatRWF(Math.max(0, remaining))}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#64748b]">{t("sales.remaining")}</span><span className="font-semibold text-[#1e293b]">{formatRWF(Math.max(0, remaining))}</span></div>
                 </div>
-                <Button type="submit" className="w-full h-12 bg-[#2563eb]" disabled={createMutation.isPending} data-testid="button-submit-sale">
-                  {createMutation.isPending ? "Saving..." : "Record Sale"}
+                <Button type="submit" className="w-full h-12 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]" disabled={createMutation.isPending} data-testid="button-submit-sale">
+                  {createMutation.isPending ? t("sales.saving") : t("sales.record")}
                 </Button>
               </form>
             </Form>
@@ -154,28 +156,28 @@ export default function SalesPage() {
           ) : !sales?.length ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <TrendingUp className="h-12 w-12 text-[#64748b] mb-4" />
-              <p className="text-[#1e293b] font-medium">No sales yet</p>
-              <p className="text-sm text-[#64748b]">Record your first sale</p>
+              <p className="text-[#1e293b] font-medium">{t("sales.no_sales")}</p>
+              <p className="text-sm text-[#64748b]">{t("sales.add_first")}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-b border-[#e2e8f0]">
-                    <TableHead className="text-[#64748b]">Ref</TableHead>
-                    <TableHead className="text-[#64748b]">Date</TableHead>
-                    <TableHead className="text-[#64748b]">Customer</TableHead>
-                    <TableHead className="text-[#64748b]">Item</TableHead>
-                    <TableHead className="text-[#64748b] text-right">Qty</TableHead>
-                    <TableHead className="text-[#64748b] text-right">Total (RWF)</TableHead>
-                    <TableHead className="text-[#64748b] text-right">Received (RWF)</TableHead>
-                    <TableHead className="text-[#64748b] text-right">Remaining (RWF)</TableHead>
-                    <TableHead className="text-[#64748b]">Status</TableHead>
+                    <TableHead className="text-[#64748b]">{t("sales.ref")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("sales.date")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("sales.customer")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("sales.item")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right">{t("sales.quantity")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right">{t("sales.total_rwf")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right">{t("sales.received_rwf")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right">{t("sales.remaining_rwf")}</TableHead>
+                    <TableHead className="text-[#64748b]">{t("common.status")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sales.map((s) => (
-                    <TableRow key={s.id} className="border-b border-[#e2e8f0]" data-testid={`row-sale-${s.id}`}>
+                  {sales.map((s, i) => (
+                    <TableRow key={s.id} className="border-b border-[#e2e8f0] animate-row-slide" style={{ animationDelay: `${i * 30}ms` }} data-testid={`row-sale-${s.id}`}>
                       <TableCell className="font-mono text-xs text-[#1e293b]">{s.reference_no}</TableCell>
                       <TableCell className="text-[#64748b]">{s.sale_date}</TableCell>
                       <TableCell className="text-[#1e293b]">{s.customer?.customer_name || "—"}</TableCell>

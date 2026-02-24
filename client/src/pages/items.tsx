@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Item, InsertItem } from "@shared/schema";
@@ -19,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Package } from "lucide-react";
 
 export default function ItemsPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
 
@@ -37,47 +39,47 @@ export default function ItemsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/items"] });
-      toast({ title: "Item created successfully" });
+      toast({ title: t("common.item_created") });
       form.reset();
       setOpen(false);
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 animate-page-fade">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-[#1e293b]" data-testid="text-page-title">Items</h1>
-          <p className="text-sm text-[#64748b]">Manage your grocery items inventory</p>
+          <h1 className="text-2xl font-bold text-[#1e293b]" data-testid="text-page-title">{t("items.title")}</h1>
+          <p className="text-sm text-[#64748b]">{t("items.subtitle")}</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="h-12 bg-[#2563eb]" data-testid="button-add-item">
-              <Plus className="h-4 w-4 mr-2" /> Add Item
+            <Button className="h-12 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]" data-testid="button-add-item">
+              <Plus className="h-4 w-4 mr-2" /> {t("items.add_item")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Item</DialogTitle>
+              <DialogTitle>{t("items.add_new_item")}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-4">
                 <FormField control={form.control} name="item_name" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Item Name</FormLabel>
+                    <FormLabel>{t("items.item_name")}</FormLabel>
                     <FormControl><Input {...field} data-testid="input-item-name" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="measurement_type" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Measurement Type</FormLabel>
+                    <FormLabel>{t("items.measurement_type")}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger data-testid="select-measurement-type"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="WEIGHT">Weight</SelectItem>
-                        <SelectItem value="VOLUME">Volume</SelectItem>
+                        <SelectItem value="WEIGHT">{t("items.weight")}</SelectItem>
+                        <SelectItem value="VOLUME">{t("items.volume")}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -85,7 +87,7 @@ export default function ItemsPage() {
                 )} />
                 <FormField control={form.control} name="base_unit" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Base Unit</FormLabel>
+                    <FormLabel>{t("items.base_unit")}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger data-testid="select-base-unit"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
@@ -98,12 +100,12 @@ export default function ItemsPage() {
                 )} />
                 <FormField control={form.control} name="is_active" render={({ field }) => (
                   <FormItem className="flex items-center justify-between rounded-lg border border-[#e2e8f0] p-4">
-                    <FormLabel>Active</FormLabel>
+                    <FormLabel>{t("items.active")}</FormLabel>
                     <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-active" /></FormControl>
                   </FormItem>
                 )} />
-                <Button type="submit" className="w-full h-12 bg-[#2563eb]" disabled={createMutation.isPending} data-testid="button-submit-item">
-                  {createMutation.isPending ? "Creating..." : "Create Item"}
+                <Button type="submit" className="w-full h-12 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]" disabled={createMutation.isPending} data-testid="button-submit-item">
+                  {createMutation.isPending ? t("items.creating") : t("items.create_item")}
                 </Button>
               </form>
             </Form>
@@ -120,28 +122,28 @@ export default function ItemsPage() {
           ) : !items?.length ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Package className="h-12 w-12 text-[#64748b] mb-4" />
-              <p className="text-[#1e293b] font-medium">No items yet</p>
-              <p className="text-sm text-[#64748b]">Add your first grocery item to get started</p>
+              <p className="text-[#1e293b] font-medium">{t("items.no_items")}</p>
+              <p className="text-sm text-[#64748b]">{t("items.add_first_item")}</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="border-b border-[#e2e8f0]">
-                  <TableHead className="text-[#64748b]">Item Name</TableHead>
-                  <TableHead className="text-[#64748b]">Measurement</TableHead>
-                  <TableHead className="text-[#64748b]">Base Unit</TableHead>
-                  <TableHead className="text-[#64748b]">Status</TableHead>
+                  <TableHead className="text-[#64748b]">{t("items.item_name")}</TableHead>
+                  <TableHead className="text-[#64748b]">{t("items.measurement_type")}</TableHead>
+                  <TableHead className="text-[#64748b]">{t("items.base_unit")}</TableHead>
+                  <TableHead className="text-[#64748b]">{t("items.status")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id} className="border-b border-[#e2e8f0]" data-testid={`row-item-${item.id}`}>
+                {items.map((item, i) => (
+                  <TableRow key={item.id} className="border-b border-[#e2e8f0] animate-row-slide" style={{ animationDelay: `${i * 30}ms` }} data-testid={`row-item-${item.id}`}>
                     <TableCell className="font-medium text-[#1e293b]">{item.item_name}</TableCell>
                     <TableCell className="text-[#64748b]">{item.measurement_type}</TableCell>
                     <TableCell className="text-[#64748b]">{item.base_unit}</TableCell>
                     <TableCell>
                       <Badge variant={item.is_active ? "default" : "secondary"}>
-                        {item.is_active ? "Active" : "Inactive"}
+                        {item.is_active ? t("items.active") : t("items.inactive")}
                       </Badge>
                     </TableCell>
                   </TableRow>
