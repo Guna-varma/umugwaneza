@@ -1,0 +1,233 @@
+Build a FULLY FUNCTIONAL production-ready B2B Web Platform
+
+NAME:
+UMUGWANEZA LTD
+(Wholesale Trading + Fleet & Machinery Rental Web Platform)
+
+=========================================
+IMPORTANT: SAME DATABASE AS HAPYJO
+=========================================
+
+HAPYJO LTD is an ANDROID APP already using this SAME Supabase Database.
+Website MUST USE SAME DATABASE PROJECT. Do NOT create another DB.
+
+HAPYJO uses PUBLIC schema.
+UMUGWANEZA MUST USE SEPARATE SCHEMA:
+
+  CREATE SCHEMA IF NOT EXISTS umugwaneza;
+
+All UMUGWANEZA tables go inside schema umugwaneza.
+When querying from the web app, use Supabase client with schema set to umugwaneza (e.g. .schema('umugwaneza') or equivalent) so all reads/writes go to umugwaneza.* tables, NOT public.
+
+=========================================
+TECH STACK
+=========================================
+
+Frontend: React + Vite + TypeScript
+Backend: Supabase (same DB as HAPYJO)
+Auth: DO NOT USE SUPABASE AUTH. Use ONLY DUMMY AUTH (local login simulation).
+
+=========================================
+ROLES (TWO ROLES – DUMMY LOGIN FOR BOTH)
+=========================================
+
+1) SYSTEM ADMIN (platform level)
+   - Creates business + owner.
+   - Cannot view or access any business financial data (no purchases, sales, rentals, reports).
+   - Dummy login for now: Email: admin@umugwaneza.rw  Password: 123456
+   - On login store in localStorage: { role: "SYSTEM_ADMIN", admin_name: "System Admin" }
+   - System Admin screens: e.g. Create Business, Create Owner (no dashboard/reports/financial data).
+
+2) OWNER (business level)
+   - Full control inside their business: grocery, rental, payments, reports, dashboard.
+   - Dummy login for now: Email: owner@umugwaneza.rw  Password: 123456
+   - On login store in localStorage: { business_id: "biz_001", owner_name: "UMUGWANEZA OWNER", role: "OWNER" }
+   - All data queries MUST filter by: business_id = 'biz_001'
+
+Create one business in umugwaneza.businesses with id = 'biz_001' (TEXT primary key) so it matches localStorage. All other UMUGWANEZA tables must have business_id FK; for Owner, always use 'biz_001'.
+
+=========================================
+THEME (STRICTLY FOLLOW)
+=========================================
+
+Background: #f8fafc
+Cards: #ffffff
+Primary: #2563eb
+Text Primary: #1e293b
+Text Secondary: #64748b
+Border: #e2e8f0
+TOTAL Row BG: #f1f5f9
+Border Radius: 8px
+Button Height: 48px
+
+NO flashy colors, NO glassmorphism, NO shadow glow, NO modern trendy UI.
+STRICT: Classic Professional Enterprise Website UI.
+
+=========================================
+TERMINOLOGY
+=========================================
+
+Never use: Driver, Driver-Machine
+Always use: Operator
+
+=========================================
+HAPYJO TABLE TO SYNC (MASTER FLEET)
+=========================================
+
+Use EXISTING table: public.vehicles (from Hapyjo mobile app).
+This is the MASTER FLEET TABLE for sync.
+
+=========================================
+UMUGWANEZA TABLES (CREATE IN SCHEMA umugwaneza)
+=========================================
+
+- umugwaneza.businesses
+  Columns: id (TEXT PK, use 'biz_001'), name, currency DEFAULT 'RWF', created_at, updated_at
+
+- umugwaneza.items
+  Columns: id (UUID), business_id, item_name, measurement_type (WEIGHT/VOLUME), base_unit (KG/LITRE), is_active, created_at, updated_at
+
+- umugwaneza.suppliers
+  Columns: id, business_id, supplier_name, phone, address, notes, created_at, updated_at
+
+- umugwaneza.customers
+  Columns: id, business_id, customer_name, phone, address, notes, created_at, updated_at
+
+- umugwaneza.purchases
+  Columns: id, business_id, supplier_id, reference_no, purchase_date, item_id (or item reference), total_quantity, unit, unit_price, total_purchase_cost, amount_paid, remaining_amount, financial_status (PENDING/PARTIAL/FULLY_SETTLED), created_at, updated_at
+
+- umugwaneza.sales
+  Columns: id, business_id, customer_id, reference_no, sale_date, item_id, total_quantity, unit, unit_price, total_sale_amount, amount_received, remaining_amount, financial_status (PENDING/PARTIAL/FULLY_RECEIVED), created_at, updated_at
+
+- umugwaneza.grocery_payments
+  Columns: id, business_id, reference_type (PURCHASE/SALE), reference_id, amount, payment_date, mode, notes, created_at
+
+- umugwaneza.external_asset_owners
+  Columns: id, business_id, owner_name, phone, address, notes, created_at, updated_at
+
+- umugwaneza.vehicles
+  Columns: id, business_id, hapyjo_vehicle_id (TEXT, nullable), vehicle_name, vehicle_type (TRUCK/MACHINE), rental_type (DAY/HOUR), ownership_type (OWN/EXTERNAL), base_rate, current_status (AVAILABLE/RENTED_OUT/RENTED_IN/MAINTENANCE/OFFLINE), current_location, notes, created_at, updated_at
+
+- umugwaneza.rental_contracts
+  Columns: id, business_id, vehicle_id, rental_direction (OUTGOING/INCOMING), customer_id (nullable), external_owner_id (nullable), rental_start_datetime, rental_end_datetime, rate, total_amount, amount_paid, remaining_amount, financial_status, operational_status (ACTIVE/COMPLETED/CANCELLED), location, notes, created_at, updated_at
+
+- umugwaneza.rental_payments
+  Columns: id, business_id, rental_contract_id, amount, payment_date, mode, notes, created_at
+
+=========================================
+VEHICLE SYNC LOGIC
+=========================================
+
+- umugwaneza.vehicles must have column: hapyjo_vehicle_id TEXT (nullable).
+- Sync: Fetch ALL rows from public.vehicles. Insert or Update into umugwaneza.vehicles (for business_id = 'biz_001') with mapping:
+  - public.vehicles.id          → hapyjo_vehicle_id
+  - public.vehicles.vehicle_number_or_id → vehicle_name
+  - public.vehicles.type        → vehicle_type (map 'truck'→'TRUCK', 'machine'→'MACHINE')
+- Add a "SYNC VEHICLES" button in the Vehicles UI. On click, run the sync (read public.vehicles, upsert umugwaneza.vehicles).
+- If public.vehicles is empty on first run: seed 3–5 test vehicles into public.vehicles (e.g. with a test site_id if required by Hapyjo schema), then run sync so umugwaneza.vehicles gets data.
+
+=========================================
+VEHICLE STATUS
+=========================================
+
+AVAILABLE | RENTED_OUT | RENTED_IN | MAINTENANCE | OFFLINE
+
+=========================================
+RENTAL OVERLAP BLOCK
+=========================================
+
+Block new rental contract if for the same vehicle there exists a row where:
+  existing_start < new_end  AND  existing_end > new_start  AND  operational_status = 'ACTIVE'
+Enforce this check in backend/DB (trigger or API) before insert. Show clear error in UI if blocked.
+
+=========================================
+GROCERY LOGIC
+=========================================
+
+- Purchase → Stock increases (by total_quantity for that item).
+- Sale → Stock decreases. Validate: sale quantity cannot exceed current stock for that item.
+- Financial status: PENDING | PARTIAL | FULLY_SETTLED (purchases) / FULLY_RECEIVED (sales).
+- Profit = TOTAL SALES - TOTAL PURCHASES (payment status does not affect profit).
+
+=========================================
+RENTAL LOGIC
+=========================================
+
+- Outgoing: Our vehicle → Customer. Incoming: External owner → Our business.
+- Auto-calculate total: DAY rental = days × rate; HOUR rental = hours × rate.
+- When a rental becomes ACTIVE, auto-update vehicle current_status (e.g. RENTED_OUT for outgoing). When COMPLETED/CANCELLED, set vehicle back to AVAILABLE (or as per business rule).
+
+=========================================
+DASHBOARD (OWNER ONLY)
+=========================================
+
+Grocery: Total Stock | Today Sales | Monthly Sales | Monthly Profit | Outstanding Payables | Outstanding Receivables
+Rental: Total Vehicles | Available | Rented Out | Rented In | Maintenance | Today Rental Revenue | Monthly Rental Revenue
+
+=========================================
+REPORTS (OWNER ONLY – DAILY UNIFIED FOR NOW)
+=========================================
+
+Implement at least the Daily Unified Report:
+- Filter: selected date.
+- Table columns: Date | Type (Purchase/Sale/Rental Out/Rental In) | Reference | Party | Item/Vehicle | Quantity | Total | Paid | Remaining | Status
+- Final row (TOTAL): Total Purchase | Total Sales | Total Rental Revenue | Total Rental Cost | Net Profit. Style: bold, background #f1f5f9.
+
+=========================================
+CSV DOWNLOAD
+=========================================
+
+Filename: UMUGWANEZA_LTD_Report_YYYY-MM-DD.csv
+Currency column header: "Total Amount (RWF)". Data cells: numeric only, NO currency symbol.
+
+=========================================
+PAYMENT ANIMATION
+=========================================
+
+On payment success (grocery or rental): subtle Fade In + Scale animation, duration 400ms, ease-in-out. NO popups, NO confetti, NO sound.
+
+=========================================
+DUMMY DATA (FIRST RUN)
+=========================================
+
+Auto-insert when app runs first time (or when DB is empty):
+- 1 Business (id = 'biz_001')
+- 3 Suppliers, 3 Customers, 5 Grocery Items (all business_id = 'biz_001')
+- If public.vehicles is empty, seed a few vehicles there then run Vehicle Sync so umugwaneza.vehicles has 5 vehicles for biz_001
+- 2 External asset owners
+- 2 Purchase entries, 2 Sales entries (so stock and profit are testable)
+- 2 Rental contracts (1 outgoing, 1 incoming or as appropriate)
+
+=========================================
+SECURITY
+=========================================
+
+All queries for Owner-scoped data MUST include: business_id = 'biz_001'. System Admin must NOT have access to business financial data.
+
+=========================================
+ENV VARIABLES
+=========================================
+
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+
+=========================================
+BUILD MODULES
+=========================================
+
+- Login Page (dummy: two options or two accounts – System Admin, Owner)
+- Dashboard (Owner only)
+- Items | Suppliers | Customers | Purchases | Sales | Payments
+- Vehicles | External Owners | Outgoing Rental | Incoming Rental
+- Reports (Daily Unified Report + CSV download)
+- Vehicle Sync (button + sync logic)
+- System Admin: Create Business / Create Owner (no financial data screens)
+
+=========================================
+IMPORTANT
+=========================================
+
+All functionality MUST WORK with dummy auth and dummy data.
+UI: Classic Corporate Financial Software. NOT startup style.
+
+BUILD COMPLETE APPLICATION. END.
