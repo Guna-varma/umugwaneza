@@ -219,6 +219,14 @@
   animation: row-slide-in 0.3s ease-out both;
 }
 
+/* Safe area for notched devices (mobile) */
+.safe-area-padding {
+  padding-left: max(0.75rem, env(safe-area-inset-left));
+  padding-right: max(0.75rem, env(safe-area-inset-right));
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
 @layer base {
   * {
     @apply border-border;

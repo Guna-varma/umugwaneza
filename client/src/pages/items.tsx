@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/useAuth";
+import { db } from "@/lib/supabase";
 import type { Item, InsertItem } from "@shared/schema";
 import { insertItemSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -22,10 +24,17 @@ import { Plus, Package } from "lucide-react";
 export default function ItemsPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const businessId = user?.business_id ?? "biz_001";
   const [open, setOpen] = useState(false);
 
   const { data: items, isLoading } = useQuery<Item[]>({
-    queryKey: ["/api/items"],
+    queryKey: ["umugwaneza", "items", businessId],
+    queryFn: async () => {
+      const { data, error } = await db().from("items").select("*").eq("business_id", businessId).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const form = useForm<InsertItem>({
@@ -35,10 +44,18 @@ export default function ItemsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertItem) => {
-      await apiRequest("POST", "/api/items", values);
+      const { data, error } = await db()
+        .from("items")
+        .insert({ ...values, business_id: businessId })
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data as Item;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+    onSuccess: (newItem) => {
+      queryClient.setQueryData<Item[]>(["umugwaneza", "items", businessId], (prev) =>
+        prev ? [newItem, ...prev] : [newItem]
+      );
       toast({ title: t("common.item_created") });
       form.reset();
       setOpen(false);
@@ -62,6 +79,7 @@ export default function ItemsPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{t("items.add_new_item")}</DialogTitle>
+              <DialogDescription>{t("items.add_first_item")}</DialogDescription>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-4">

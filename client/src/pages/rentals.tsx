@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/useAuth";
+import { db } from "@/lib/supabase";
 import type { RentalContract, InsertRentalContract, Vehicle, Customer, ExternalAssetOwner, RentalPayment, InsertRentalPayment } from "@shared/schema";
 import { insertRentalContractSchema, insertRentalPaymentSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -52,6 +54,8 @@ function calculateTotal(start: string, end: string, rate: number, rentalType: st
 export default function RentalsPage({ direction }: { direction: "OUTGOING" | "INCOMING" }) {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const businessId = user?.business_id ?? "biz_001";
   const [open, setOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<RentalContract | null>(null);
@@ -60,19 +64,39 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
   const isOutgoing = direction === "OUTGOING";
 
   const { data: contracts, isLoading } = useQuery<RentalContract[]>({
-    queryKey: ["/api/rental-contracts?direction=" + direction],
+    queryKey: ["umugwaneza", "rental_contracts", businessId, direction],
+    queryFn: async () => {
+      const { data, error } = await db().from("rental_contracts").select("*, vehicle:vehicles(*), customer:customers(*), external_owner:external_asset_owners(*)").eq("business_id", businessId).eq("rental_direction", direction).order("rental_start_datetime", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const { data: vehicles } = useQuery<Vehicle[]>({
-    queryKey: ["/api/vehicles"],
+    queryKey: ["umugwaneza", "vehicles", businessId],
+    queryFn: async () => {
+      const { data, error } = await db().from("vehicles").select("*").eq("business_id", businessId).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const { data: customers } = useQuery<Customer[]>({
-    queryKey: ["/api/customers"],
+    queryKey: ["umugwaneza", "customers", businessId],
+    queryFn: async () => {
+      const { data, error } = await db().from("customers").select("*").eq("business_id", businessId).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const { data: externalOwners } = useQuery<ExternalAssetOwner[]>({
-    queryKey: ["/api/external-owners"],
+    queryKey: ["umugwaneza", "external_asset_owners", businessId],
+    queryFn: async () => {
+      const { data, error } = await db().from("external_asset_owners").select("*").eq("business_id", businessId).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const form = useForm<InsertRentalContract>({
@@ -93,22 +117,30 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertRentalContract) => {
-      await apiRequest("POST", "/api/rental-contracts", {
+      const total_amount = autoTotal;
+      const { error } = await db().from("rental_contracts").insert({
+        business_id: businessId,
         vehicle_id: values.vehicle_id,
         rental_direction: direction,
-        customer_id: values.customer_id,
-        external_owner_id: values.external_owner_id,
+        customer_id: values.customer_id || null,
+        external_owner_id: values.external_owner_id || null,
         rental_start_datetime: values.rental_start_datetime,
         rental_end_datetime: values.rental_end_datetime,
         rate: values.rate,
-        location: values.location,
-        notes: values.notes,
+        total_amount,
+        amount_paid: 0,
+        remaining_amount: total_amount,
+        financial_status: "PENDING",
+        operational_status: "ACTIVE",
+        location: values.location || null,
+        notes: values.notes || null,
       });
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rental-contracts?direction=" + direction] });
-      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/rental"] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "rental_contracts", businessId, direction] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "vehicles", businessId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "rental"] });
       toast({ title: t("common.rental_created") });
       form.reset({ vehicle_id: "", rental_direction: direction, customer_id: null, external_owner_id: null, rental_start_datetime: "", rental_end_datetime: "", rate: 0, location: "", notes: "" });
       setOpen(false);
@@ -118,11 +150,14 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
 
   const completeMutation = useMutation({
     mutationFn: async (contract: RentalContract) => {
-      await apiRequest("PATCH", "/api/rental-contracts/" + contract.id + "/complete");
+      const { error: err1 } = await db().from("rental_contracts").update({ operational_status: "COMPLETED" }).eq("id", contract.id);
+      if (err1) throw new Error(err1.message);
+      const { error: err2 } = await db().from("vehicles").update({ current_status: "AVAILABLE" }).eq("id", contract.vehicle_id);
+      if (err2) throw new Error(err2.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rental-contracts?direction=" + direction] });
-      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "rental_contracts", businessId, direction] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "vehicles", businessId] });
       toast({ title: t("common.contract_completed") });
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
@@ -135,16 +170,12 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
 
   const payMutation = useMutation({
     mutationFn: async (values: InsertRentalPayment) => {
-      await apiRequest("POST", "/api/rental-payments", {
-        rental_contract_id: values.rental_contract_id,
-        amount: values.amount,
-        payment_date: values.payment_date,
-        mode: values.mode,
-        notes: values.notes,
-      });
+      const { error } = await db().from("rental_payments").insert({ ...values, business_id: businessId });
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rental-contracts?direction=" + direction] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "rental_contracts", businessId, direction] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "rental_payments", businessId] });
       setPaymentSuccess(true);
       setTimeout(() => {
         setPaymentSuccess(false);

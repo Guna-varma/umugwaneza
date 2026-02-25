@@ -2,10 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
+import { db } from "@/lib/supabase";
 
 export function NotificationBell() {
   const [, setLocation] = useLocation();
-  const { data: notifications } = useQuery<any[]>({ queryKey: ["/api/notifications"], refetchInterval: 30000 });
+  const { data: notifications } = useQuery<any[]>({
+    queryKey: ["umugwaneza", "recent_activity"],
+    queryFn: async () => {
+      const { data, error } = await db().rpc("get_recent_activity", { p_limit: 50 }).single();
+      if (error) throw new Error(error.message);
+      const list = data != null && typeof data === "object" && !Array.isArray(data) ? (Object.values(data)[0] as any) : data;
+      return Array.isArray(list) ? list : [];
+    },
+    refetchInterval: 30000,
+  });
   const count = notifications?.length || 0;
 
   return (

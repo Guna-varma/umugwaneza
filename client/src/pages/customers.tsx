@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/useAuth";
+import { db } from "@/lib/supabase";
 import type { Customer, InsertCustomer } from "@shared/schema";
 import { insertCustomerSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,10 +22,17 @@ import { Plus, UserCheck } from "lucide-react";
 export default function CustomersPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const businessId = user?.business_id ?? "biz_001";
   const [open, setOpen] = useState(false);
 
   const { data: customers, isLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/customers"],
+    queryKey: ["umugwaneza", "customers", businessId],
+    queryFn: async () => {
+      const { data, error } = await db().from("customers").select("*").eq("business_id", businessId).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const form = useForm<InsertCustomer>({
@@ -33,10 +42,11 @@ export default function CustomersPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertCustomer) => {
-      await apiRequest("POST", "/api/customers", values);
+      const { error } = await db().from("customers").insert({ ...values, business_id: businessId });
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "customers", businessId] });
       toast({ title: t("common.customer_created") });
       form.reset();
       setOpen(false);

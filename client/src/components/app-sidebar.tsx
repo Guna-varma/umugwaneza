@@ -1,6 +1,6 @@
 import { useLocation, Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/useAuth";
 import {
   LayoutDashboard,
   Package,

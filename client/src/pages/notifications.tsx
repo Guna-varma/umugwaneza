@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
+import { db } from "@/lib/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,7 +39,17 @@ function formatTimeAgo(timestamp: string) {
 
 export default function NotificationsPage() {
   const { t } = useTranslation();
-  const { data: notifications, isLoading } = useQuery<any[]>({ queryKey: ["/api/notifications"] });
+  const { data: notifications, isLoading, dataUpdatedAt } = useQuery<any[]>({
+    queryKey: ["umugwaneza", "recent_activity"],
+    queryFn: async () => {
+      const { data, error } = await db().rpc("get_recent_activity", { p_limit: 50 }).single();
+      if (error) throw new Error(error.message);
+      const list = data != null && typeof data === "object" && !Array.isArray(data) ? (Object.values(data)[0] as any) : data;
+      return Array.isArray(list) ? list : [];
+    },
+    refetchInterval: 30000,
+  });
+  const isLive = dataUpdatedAt ? Date.now() - dataUpdatedAt < 6000 : false;
 
   return (
     <div className="p-6 space-y-6 animate-page-fade">
@@ -47,11 +58,16 @@ export default function NotificationsPage() {
           <h1 className="text-2xl font-bold text-[#1e293b]" data-testid="text-page-title">{t("notifications.title")}</h1>
           <p className="text-sm text-[#64748b]">{t("notifications.subtitle")}</p>
         </div>
-        {notifications && notifications.length > 0 && (
-          <Badge variant="secondary" className="text-sm" data-testid="badge-notification-count">
-            {notifications.length} {t("notifications.items")}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {isLive && (
+            <Badge className="bg-green-600 text-white text-xs" data-testid="badge-live">Live</Badge>
+          )}
+          {notifications && notifications.length > 0 && (
+            <Badge variant="secondary" className="text-sm" data-testid="badge-notification-count">
+              {notifications.length} {t("notifications.items")}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -69,8 +85,9 @@ export default function NotificationsPage() {
           {notifications.map((n: any, i: number) => {
             const Icon = iconMap[n.type] || Bell;
             const colorClass = colorMap[n.type] || "bg-gray-100 text-gray-600";
+            const ts = n.created_at || n.timestamp;
             return (
-              <Card key={n.id} className="border border-[#e2e8f0] bg-white transition-all duration-200 hover:shadow-sm animate-row-slide" style={{ animationDelay: `${i * 40}ms` }} data-testid={`notification-${n.id}`}>
+              <Card key={`${n.type}-${ts}-${i}`} className="border border-[#e2e8f0] bg-white transition-all duration-200 hover:shadow-sm animate-row-slide" style={{ animationDelay: `${i * 40}ms` }} data-testid={`notification-${i}`}>
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${colorClass}`}>
@@ -79,14 +96,9 @@ export default function NotificationsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-semibold text-[#1e293b] truncate">{n.title}</p>
-                        <span className="text-xs text-[#64748b] whitespace-nowrap">{formatTimeAgo(n.timestamp)}</span>
+                        <span className="text-xs text-[#64748b] whitespace-nowrap">{formatTimeAgo(ts)}</span>
                       </div>
                       <p className="text-sm text-[#64748b] mt-1">{n.description}</p>
-                      <div className="mt-2">
-                        <Badge variant={n.status === "COMPLETED" || n.status === "FULLY_SETTLED" || n.status === "FULLY_RECEIVED" ? "default" : "secondary"} className="text-xs" data-testid={`badge-notif-status-${n.id}`}>
-                          {String(n.status).replace(/_/g, " ")}
-                        </Badge>
-                      </div>
                     </div>
                   </div>
                 </CardContent>

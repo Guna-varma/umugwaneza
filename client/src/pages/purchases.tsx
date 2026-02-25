@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/useAuth";
+import { db } from "@/lib/supabase";
 import type { Purchase, InsertPurchase, Supplier, Item } from "@shared/schema";
 import { insertPurchaseSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -31,18 +33,35 @@ function statusColor(status: string) {
 export default function PurchasesPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const businessId = user?.business_id ?? "biz_001";
   const [open, setOpen] = useState(false);
 
   const { data: purchases, isLoading } = useQuery<Purchase[]>({
-    queryKey: ["/api/purchases"],
+    queryKey: ["umugwaneza", "purchases", businessId],
+    queryFn: async () => {
+      const { data, error } = await db().from("purchases").select("*, supplier:suppliers(*), item:items(*)").eq("business_id", businessId).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const { data: suppliers } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers"],
+    queryKey: ["umugwaneza", "suppliers", businessId],
+    queryFn: async () => {
+      const { data, error } = await db().from("suppliers").select("*").eq("business_id", businessId).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const { data: items } = useQuery<Item[]>({
-    queryKey: ["/api/items?active=true"],
+    queryKey: ["umugwaneza", "items", businessId, "active"],
+    queryFn: async () => {
+      const { data, error } = await db().from("items").select("*").eq("business_id", businessId).eq("is_active", true).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const form = useForm<InsertPurchase>({
@@ -58,19 +77,32 @@ export default function PurchasesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertPurchase) => {
-      await apiRequest("POST", "/api/purchases", {
+      const total = values.total_quantity * values.unit_price;
+      const paid = values.amount_paid ?? 0;
+      const remaining = Math.max(0, total - paid);
+      let financial_status = "PENDING";
+      if (paid >= total) financial_status = "FULLY_SETTLED";
+      else if (paid > 0) financial_status = "PARTIAL";
+      const refNo = "PUR-" + Date.now().toString(36).toUpperCase();
+      const { error } = await db().from("purchases").insert({
+        business_id: businessId,
         supplier_id: values.supplier_id,
+        reference_no: refNo,
         purchase_date: values.purchase_date,
         item_id: values.item_id,
         total_quantity: values.total_quantity,
         unit: values.unit,
         unit_price: values.unit_price,
-        amount_paid: values.amount_paid,
+        total_purchase_cost: total,
+        amount_paid: paid,
+        remaining_amount: remaining,
+        financial_status,
       });
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/grocery"] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "purchases", businessId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "grocery"] });
       toast({ title: t("common.purchase_recorded") });
       form.reset();
       setOpen(false);

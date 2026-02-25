@@ -1,0 +1,23 @@
+# UMUGWANEZA LTD - Supabase CLI config
+# Uses the SAME Supabase project as HAPYJO (set project_id in dashboard or link)
+# Run: supabase link (then run migrations) or apply SQL manually in Dashboard > SQL Editor
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public"]
+
+[db]
+port = 54322
+shadow_port = 54320
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+
+[storage]
+enabled = true

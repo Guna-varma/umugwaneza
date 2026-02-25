@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
+import { db } from "@/lib/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,35 +50,121 @@ export default function ReportsPage() {
   const [customerId, setCustomerId] = useState("");
   const [generateKey, setGenerateKey] = useState("");
 
-  const { data: suppliers } = useQuery({ queryKey: ["/api/suppliers"] });
-  const { data: customers } = useQuery({ queryKey: ["/api/customers"] });
+  const { data: suppliers } = useQuery({
+    queryKey: ["umugwaneza", "suppliers"],
+    queryFn: async () => {
+      const { data, error } = await db().from("suppliers").select("id, supplier_name").order("supplier_name");
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
+  const { data: customers } = useQuery({
+    queryKey: ["umugwaneza", "customers"],
+    queryFn: async () => {
+      const { data, error } = await db().from("customers").select("id, customer_name").order("customer_name");
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
 
-  function buildQueryUrl() {
+  async function fetchReport(): Promise<any> {
     switch (reportType) {
-      case "daily": return `/api/reports/daily?date=${selectedDate}`;
-      case "monthly": return `/api/reports/monthly?month=${selectedMonth}&year=${selectedYear}`;
-      case "custom": return `/api/reports/custom?from=${fromDate}&to=${toDate}`;
-      case "purchases": return `/api/reports/purchases?from=${fromDate}&to=${toDate}${supplierId ? `&supplier_id=${supplierId}` : ""}`;
-      case "sales": return `/api/reports/sales?from=${fromDate}&to=${toDate}${customerId ? `&customer_id=${customerId}` : ""}`;
-      case "profit": return `/api/reports/profit?from=${fromDate}&to=${toDate}`;
-      case "outstanding_payables": return `/api/reports/outstanding-payables${supplierId ? `?supplier_id=${supplierId}` : ""}`;
-      case "outstanding_receivables": return `/api/reports/outstanding-receivables${customerId ? `?customer_id=${customerId}` : ""}`;
-      case "stock_summary": return `/api/reports/stock-summary`;
-      case "supplier_ledger": return `/api/reports/supplier-ledger?supplier_id=${supplierId}&from=${fromDate}&to=${toDate}`;
-      case "customer_ledger": return `/api/reports/customer-ledger?customer_id=${customerId}&from=${fromDate}&to=${toDate}`;
-      case "rental_outgoing": return `/api/reports/rental-outgoing?from=${fromDate}&to=${toDate}`;
-      case "rental_incoming": return `/api/reports/rental-incoming?from=${fromDate}&to=${toDate}`;
-      case "vehicle_utilization": return `/api/reports/vehicle-utilization?from=${fromDate}&to=${toDate}`;
-      case "rental_profit": return `/api/reports/rental-profit?from=${fromDate}&to=${toDate}`;
-      default: return `/api/reports/daily?date=${selectedDate}`;
+      case "daily": {
+        const { data, error } = await db().rpc("report_daily", { p_date: selectedDate });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "monthly": {
+        const { data, error } = await db().rpc("report_monthly", { p_month: parseInt(selectedMonth, 10), p_year: parseInt(selectedYear, 10) });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "custom": {
+        const { data, error } = await db().rpc("report_custom", { p_from: fromDate, p_to: toDate });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "purchases": {
+        const supId = supplierId && supplierId !== "all" ? supplierId : null;
+        const { data, error } = await db().rpc("report_purchases", { p_from: fromDate, p_to: toDate, p_supplier_id: supId });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "sales": {
+        const custId = customerId && customerId !== "all" ? customerId : null;
+        const { data, error } = await db().rpc("report_sales", { p_from: fromDate, p_to: toDate, p_customer_id: custId });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "profit": {
+        const { data, error } = await db().rpc("report_profit", { p_from: fromDate, p_to: toDate });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "outstanding_payables": {
+        const supId = supplierId && supplierId !== "all" ? supplierId : null;
+        const { data, error } = await db().rpc("report_outstanding_payables", { p_supplier_id: supId });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "outstanding_receivables": {
+        const custId = customerId && customerId !== "all" ? customerId : null;
+        const { data, error } = await db().rpc("report_outstanding_receivables", { p_customer_id: custId });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "stock_summary": {
+        const { data, error } = await db().rpc("report_stock_summary");
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "supplier_ledger": {
+        const { data, error } = await db().rpc("report_supplier_ledger", { p_supplier_id: supplierId, p_from: fromDate || null, p_to: toDate || null });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "customer_ledger": {
+        const { data, error } = await db().rpc("report_customer_ledger", { p_customer_id: customerId, p_from: fromDate || null, p_to: toDate || null });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "rental_outgoing": {
+        const { data, error } = await db().rpc("report_rental_outgoing", { p_from: fromDate, p_to: toDate });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "rental_incoming": {
+        const { data, error } = await db().rpc("report_rental_incoming", { p_from: fromDate, p_to: toDate });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "vehicle_utilization": {
+        const { data, error } = await db().rpc("report_vehicle_utilization", { p_from: fromDate, p_to: toDate });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      case "rental_profit": {
+        const { data, error } = await db().rpc("report_rental_profit", { p_from: fromDate || null, p_to: toDate || null });
+        if (error) throw new Error(error.message);
+        return data;
+      }
+      default: {
+        const { data, error } = await db().rpc("report_daily", { p_date: selectedDate });
+        if (error) throw new Error(error.message);
+        return data;
+      }
     }
   }
 
-  const queryUrl = generateKey || buildQueryUrl();
-  const { data: reportData, isLoading } = useQuery<any>({ queryKey: [queryUrl] });
+  const queryKey = ["report", reportType, selectedDate, selectedMonth, selectedYear, fromDate, toDate, supplierId, customerId, generateKey];
+  const { data: reportData, isLoading } = useQuery<any>({
+    queryKey,
+    queryFn: fetchReport,
+    enabled: !!generateKey,
+  });
 
   const handleGenerate = () => {
-    setGenerateKey(buildQueryUrl());
+    setGenerateKey(String(Date.now()));
   };
 
   const needsDateRange = ["custom", "purchases", "sales", "profit", "supplier_ledger", "customer_ledger", "rental_outgoing", "rental_incoming", "vehicle_utilization", "rental_profit"].includes(reportType);
@@ -88,35 +175,54 @@ export default function ReportsPage() {
 
   function getCsvFilename() {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const base = "UMUGWANEZA_LTD";
     switch (reportType) {
-      case "daily": return `UMUGWANEZA_LTD_Daily_Report_${selectedDate}.csv`;
-      case "monthly": return `UMUGWANEZA_LTD_Monthly_Report_${months[parseInt(selectedMonth) - 1]}_${selectedYear}.csv`;
-      case "custom": return `UMUGWANEZA_LTD_Custom_Report_${fromDate}_to_${toDate}.csv`;
-      default: return `UMUGWANEZA_LTD_${reportType}_Report_${today}.csv`;
+      case "daily": return `${base}_Daily_Report_${selectedDate}.csv`;
+      case "monthly": return `${base}_Monthly_Report_${months[parseInt(selectedMonth, 10) - 1]}_${selectedYear}.csv`;
+      case "custom": return `${base}_Custom_Report_${fromDate}_to_${toDate}.csv`;
+      case "purchases": return `${base}_Purchases_Report_${fromDate}_to_${toDate}.csv`;
+      case "sales": return `${base}_Sales_Report_${fromDate}_to_${toDate}.csv`;
+      case "profit": return `${base}_Profit_Report_${fromDate}_to_${toDate}.csv`;
+      case "outstanding_payables": return `${base}_Outstanding_Payables_${today}.csv`;
+      case "outstanding_receivables": return `${base}_Outstanding_Receivables_${today}.csv`;
+      case "stock_summary": return `${base}_Stock_Summary_${today}.csv`;
+      case "supplier_ledger": return `${base}_Supplier_Ledger_${fromDate}_to_${toDate}.csv`;
+      case "customer_ledger": return `${base}_Customer_Ledger_${fromDate}_to_${toDate}.csv`;
+      case "rental_outgoing": return `${base}_Rental_Outgoing_${fromDate}_to_${toDate}.csv`;
+      case "rental_incoming": return `${base}_Rental_Incoming_${fromDate}_to_${toDate}.csv`;
+      case "vehicle_utilization": return `${base}_Vehicle_Utilization_${fromDate}_to_${toDate}.csv`;
+      case "rental_profit": return `${base}_Rental_Profit_${fromDate}_to_${toDate}.csv`;
+      default: return `${base}_Report_${today}.csv`;
     }
   }
 
+  function escapeCsvCell(val: unknown): string {
+    if (val === null || val === undefined) return "";
+    const s = String(val);
+    if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  }
+
   function downloadCSV() {
-    if (!reportData?.rows?.length && reportType !== "rental_profit") return;
+    if (!reportData) return;
     const csvRows: string[] = [];
     const cols = getColumns();
-    csvRows.push(cols.map(c => c.label).join(","));
-    if (reportData?.rows) {
-      for (const row of reportData.rows) {
-        csvRows.push(cols.map(c => {
-          const val = row[c.key];
-          if (typeof val === "string" && val.includes(",")) return `"${val}"`;
-          return val ?? "";
-        }).join(","));
+    csvRows.push(cols.map(c => escapeCsvCell(c.label)).join(","));
+    const rows = reportData?.rows || [];
+    for (const row of rows) {
+      csvRows.push(cols.map(c => escapeCsvCell(row[c.key])).join(","));
+    }
+    const summaryLines = getSummaryLines();
+    if (summaryLines.length > 0) {
+      csvRows.push("");
+      csvRows.push(escapeCsvCell(t("reports.totals")));
+      for (const line of summaryLines) {
+        csvRows.push(`${escapeCsvCell(line.label)},${escapeCsvCell(line.value)}`);
       }
     }
-    csvRows.push("");
-    csvRows.push(t("reports.totals"));
-    const summaryLines = getSummaryLines();
-    for (const line of summaryLines) {
-      csvRows.push(`${line.label},${line.value}`);
-    }
-    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const BOM = "\uFEFF";
+    const csv = BOM + csvRows.join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -315,7 +421,10 @@ export default function ReportsPage() {
   const columns = getColumns();
   const summaryLines = getSummaryLines();
   const rows = reportData?.rows || [];
-  const hasData = rows.length > 0 || reportType === "rental_profit";
+  const hasReport = !!reportData;
+  const hasRows = rows.length > 0;
+  const hasSummaryOnly = reportType === "rental_profit" && hasReport;
+  const canDownloadCsv = hasReport;
   const canGenerate = reportType === "supplier_ledger" ? !!supplierId : reportType === "customer_ledger" ? !!customerId : true;
 
   return (
@@ -425,13 +534,14 @@ export default function ReportsPage() {
             )}
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button className="h-10 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]" onClick={handleGenerate} disabled={!canGenerate} data-testid="button-generate">
               <Search className="h-4 w-4 mr-2" /> {t("reports.generate")}
             </Button>
-            <Button variant="outline" className="h-10 border-[#e2e8f0]" onClick={downloadCSV} disabled={!hasData} data-testid="button-download-csv">
+            <Button variant="outline" className="h-10 border-[#e2e8f0]" onClick={downloadCSV} disabled={!canDownloadCsv} data-testid="button-download-csv" title={canDownloadCsv ? t("reports.download_csv") : t("reports.generate_first_hint")}>
               <Download className="h-4 w-4 mr-2" /> {t("reports.download_csv")}
             </Button>
+            {!hasReport && <span className="text-sm text-[#64748b]">{t("reports.generate_first_hint")}</span>}
           </div>
         </CardContent>
       </Card>
@@ -462,11 +572,25 @@ export default function ReportsPage() {
           <CardContent className="p-0">
             {isLoading ? (
               <div className="p-6 space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-            ) : !hasData ? (
+            ) : !hasReport ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <FileText className="h-12 w-12 text-[#64748b] mb-4" />
+                <p className="text-[#1e293b] font-medium">{t("reports.generate_first_hint")}</p>
+                <p className="text-sm text-[#64748b]">{t("reports.subtitle")}</p>
+              </div>
+            ) : !hasRows && !hasSummaryOnly ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <FileText className="h-12 w-12 text-[#64748b] mb-4" />
                 <p className="text-[#1e293b] font-medium">{t("reports.no_data")}</p>
                 <p className="text-sm text-[#64748b]">{t("reports.select_different_date")}</p>
+                {summaryLines.length > 0 && (
+                  <div className="mt-4 text-left w-full max-w-sm border border-[#e2e8f0] rounded-lg p-4 bg-[#f8fafc]">
+                    <p className="text-sm font-medium text-[#1e293b] mb-2">{t("reports.totals")}</p>
+                    {summaryLines.map((line, i) => (
+                      <p key={i} className="text-sm text-[#64748b] flex justify-between"><span>{line.label}</span><span className="font-medium text-[#1e293b]">{line.value}</span></p>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/useAuth";
+import { db } from "@/lib/supabase";
 import type { Vehicle, InsertVehicle } from "@shared/schema";
 import { insertVehicleSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -33,11 +35,18 @@ function statusVariant(status: string) {
 export default function VehiclesPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const businessId = user?.business_id ?? "biz_001";
   const [open, setOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
   const { data: vehicles, isLoading } = useQuery<Vehicle[]>({
-    queryKey: ["/api/vehicles"],
+    queryKey: ["umugwaneza", "vehicles", businessId],
+    queryFn: async () => {
+      const { data, error } = await db().from("vehicles").select("*").eq("business_id", businessId).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const form = useForm<InsertVehicle>({
@@ -47,10 +56,11 @@ export default function VehiclesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertVehicle) => {
-      await apiRequest("POST", "/api/vehicles", values);
+      const { error } = await db().from("vehicles").insert({ ...values, business_id: businessId });
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "vehicles", businessId] });
       toast({ title: t("common.vehicle_added") });
       form.reset();
       setOpen(false);
@@ -61,11 +71,11 @@ export default function VehiclesPage() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const res = await apiRequest("POST", "/api/vehicles/sync");
-      const result = await res.json();
-      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/rental"] });
-      toast({ title: t("vehicles.sync_complete"), description: result.message || "Vehicles synced from HAPYJO." });
+      const { data, error } = await db().rpc("sync_vehicles_from_hapyjo", { p_default_business_id: businessId });
+      if (error) throw new Error(error.message);
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "vehicles", businessId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "rental"] });
+      toast({ title: t("vehicles.sync_complete"), description: (data as any)?.message ?? "Vehicles synced from HAPYJO." });
     } catch (e: any) {
       toast({ title: t("vehicles.sync_failed"), description: e.message, variant: "destructive" });
     } finally {

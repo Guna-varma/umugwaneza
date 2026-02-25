@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { db } from "@/lib/supabase";
 import {
   Package, TrendingUp, TrendingDown, DollarSign, AlertTriangle,
   Truck, CheckCircle, ArrowUpRight, ArrowDownLeft, Wrench
@@ -36,11 +37,21 @@ export default function DashboardPage() {
   const { t } = useTranslation();
 
   const { data: groceryStats, isLoading: loadingGrocery } = useQuery({
-    queryKey: ["/api/dashboard/grocery"],
+    queryKey: ["dashboard", "grocery"],
+    queryFn: async () => {
+      const { data, error } = await db().rpc("dashboard_grocery");
+      if (error) throw new Error(error.message);
+      return data;
+    },
   });
 
   const { data: rentalStats, isLoading: loadingRental } = useQuery({
-    queryKey: ["/api/dashboard/rental"],
+    queryKey: ["dashboard", "rental"],
+    queryFn: async () => {
+      const { data, error } = await db().rpc("dashboard_rental");
+      if (error) throw new Error(error.message);
+      return data;
+    },
   });
 
   if (loadingGrocery || loadingRental) {
@@ -61,8 +72,8 @@ export default function DashboardPage() {
     );
   }
 
-  const g = groceryStats as any || {};
-  const r = rentalStats as any || {};
+  const g = (groceryStats as any) || {};
+  const r = (rentalStats as any) || {};
 
   return (
     <div className="p-6 space-y-8 animate-page-fade">

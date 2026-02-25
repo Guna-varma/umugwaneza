@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/useAuth";
+import { db } from "@/lib/supabase";
 import type { Supplier, InsertSupplier } from "@shared/schema";
 import { insertSupplierSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,10 +22,17 @@ import { Plus, Users } from "lucide-react";
 export default function SuppliersPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const businessId = user?.business_id ?? "biz_001";
   const [open, setOpen] = useState(false);
 
   const { data: suppliers, isLoading } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers"],
+    queryKey: ["umugwaneza", "suppliers", businessId],
+    queryFn: async () => {
+      const { data, error } = await db().from("suppliers").select("*").eq("business_id", businessId).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const form = useForm<InsertSupplier>({
@@ -33,10 +42,11 @@ export default function SuppliersPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertSupplier) => {
-      await apiRequest("POST", "/api/suppliers", values);
+      const { error } = await db().from("suppliers").insert({ ...values, business_id: businessId });
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "suppliers", businessId] });
       toast({ title: t("common.supplier_created") });
       form.reset();
       setOpen(false);

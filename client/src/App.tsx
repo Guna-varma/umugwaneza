@@ -5,7 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { AuthProvider, useAuth } from "@/lib/auth";
+import { AuthProvider } from "@/lib/auth";
+import { useAuth } from "@/lib/useAuth";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import "@/lib/i18n";
@@ -47,6 +48,7 @@ function OwnerRouter() {
       <Route path="/reports" component={ReportsPage} />
       <Route path="/notifications" component={NotificationsPage} />
       <Route path="/">{() => <Redirect to="/dashboard" />}</Route>
+      <Route path="/:rest*">{() => <Redirect to="/dashboard" />}</Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -57,7 +59,9 @@ function AdminRouter() {
     <Switch>
       <Route path="/admin/businesses" component={AdminBusinessesPage} />
       <Route path="/admin/owners" component={AdminOwnersPage} />
+      <Route path="/admin">{() => <Redirect to="/admin/businesses" />}</Route>
       <Route path="/">{() => <Redirect to="/admin/businesses" />}</Route>
+      <Route path="/:rest*">{() => <Redirect to="/admin/businesses" />}</Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -75,20 +79,20 @@ function AuthenticatedLayout() {
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full bg-[#f8fafc]">
+      <div className="flex h-screen min-h-[100dvh] w-full bg-[#f8fafc]">
         <AppSidebar />
-        <div className="flex flex-col flex-1 min-w-0">
-          <header className="flex items-center justify-between gap-2 px-4 py-3 border-b border-[#e2e8f0] bg-white">
-            <div className="flex items-center gap-3">
-              <SidebarTrigger data-testid="button-sidebar-toggle" />
-              <span className="text-sm font-medium text-[#1e293b]">{t("app.name")}</span>
+        <div className="flex flex-col flex-1 min-w-0 min-h-0">
+          <header className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3 border-b border-[#e2e8f0] bg-white flex-shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <SidebarTrigger data-testid="button-sidebar-toggle" className="touch-manipulation" />
+              <span className="text-sm font-medium text-[#1e293b] truncate">{t("app.name")}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
               <NotificationBell />
               <LanguageSwitcher />
             </div>
           </header>
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto min-h-0">
             <div className="animate-page-fade">
               {isAdmin ? <AdminRouter /> : <OwnerRouter />}
             </div>
@@ -100,7 +104,7 @@ function AuthenticatedLayout() {
 }
 
 function AppContent() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const [location] = useLocation();
 
   useEffect(() => {
@@ -109,16 +113,23 @@ function AppContent() {
     }
   }, [isAuthenticated]);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-[#f8fafc] animate-in fade-in duration-200">
+        <div className="h-12 w-12 rounded-full border-4 border-[#e2e8f0] border-t-[#2563eb] animate-spin" aria-hidden />
+        <p className="text-sm text-[#64748b]">Loading…</p>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     if (location === "/login") {
       return <LoginPage />;
     }
-    return (
-      <Switch>
-        <Route path="/login" component={LoginPage} />
-        <Route component={LandingPage} />
-      </Switch>
-    );
+    if (location !== "/") {
+      return <Redirect to="/" />;
+    }
+    return <LandingPage />;
   }
 
   return <AuthenticatedLayout />;

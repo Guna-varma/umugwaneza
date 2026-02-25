@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/useAuth";
+import { db } from "@/lib/supabase";
 import type { Sale, InsertSale, Customer, Item } from "@shared/schema";
 import { insertSaleSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -31,18 +33,35 @@ function statusColor(status: string) {
 export default function SalesPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const businessId = user?.business_id ?? "biz_001";
   const [open, setOpen] = useState(false);
 
   const { data: sales, isLoading } = useQuery<Sale[]>({
-    queryKey: ["/api/sales"],
+    queryKey: ["umugwaneza", "sales", businessId],
+    queryFn: async () => {
+      const { data, error } = await db().from("sales").select("*, customer:customers(*), item:items(*)").eq("business_id", businessId).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const { data: customers } = useQuery<Customer[]>({
-    queryKey: ["/api/customers"],
+    queryKey: ["umugwaneza", "customers", businessId],
+    queryFn: async () => {
+      const { data, error } = await db().from("customers").select("*").eq("business_id", businessId).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const { data: items } = useQuery<Item[]>({
-    queryKey: ["/api/items?active=true"],
+    queryKey: ["umugwaneza", "items", businessId, "active"],
+    queryFn: async () => {
+      const { data, error } = await db().from("items").select("*").eq("business_id", businessId).eq("is_active", true).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const form = useForm<InsertSale>({
@@ -58,19 +77,32 @@ export default function SalesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertSale) => {
-      await apiRequest("POST", "/api/sales", {
+      const total = values.total_quantity * values.unit_price;
+      const received = values.amount_received ?? 0;
+      const remaining = Math.max(0, total - received);
+      let financial_status = "PENDING";
+      if (received >= total) financial_status = "FULLY_RECEIVED";
+      else if (received > 0) financial_status = "PARTIAL";
+      const refNo = "SAL-" + Date.now().toString(36).toUpperCase();
+      const { error } = await db().from("sales").insert({
+        business_id: businessId,
         customer_id: values.customer_id,
+        reference_no: refNo,
         sale_date: values.sale_date,
         item_id: values.item_id,
         total_quantity: values.total_quantity,
         unit: values.unit,
         unit_price: values.unit_price,
-        amount_received: values.amount_received,
+        total_sale_amount: total,
+        amount_received: received,
+        remaining_amount: remaining,
+        financial_status,
       });
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/grocery"] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "sales", businessId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "grocery"] });
       toast({ title: t("common.sale_recorded") });
       form.reset();
       setOpen(false);

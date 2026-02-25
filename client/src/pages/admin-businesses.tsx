@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { db } from "@/lib/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,15 +20,22 @@ export default function AdminBusinessesPage() {
   const [name, setName] = useState("");
 
   const { data: businesses, isLoading } = useQuery({
-    queryKey: ["/api/businesses"],
+    queryKey: ["umugwaneza", "businesses"],
+    queryFn: async () => {
+      const { data, error } = await db().from("businesses").select("*").order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   });
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/businesses", { name });
+      const id = "biz_" + Date.now();
+      const { error } = await db().from("businesses").insert({ id, name, currency: "RWF" });
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/businesses"] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "businesses"] });
       toast({ title: t("common.business_created") });
       setName("");
       setOpen(false);

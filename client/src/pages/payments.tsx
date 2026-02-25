@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/useAuth";
+import { db } from "@/lib/supabase";
 import type { InsertGroceryPayment, InsertRentalPayment } from "@shared/schema";
 import { insertGroceryPaymentSchema, insertRentalPaymentSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,12 +29,35 @@ function formatRWF(amount: number) {
 function GroceryPaymentsTab() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const businessId = user?.business_id ?? "biz_001";
   const [open, setOpen] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
-  const { data: payments, isLoading } = useQuery({ queryKey: ["/api/grocery-payments"] });
-  const { data: pendingPurchases } = useQuery<any[]>({ queryKey: ["/api/purchases?pending=true"] });
-  const { data: pendingSales } = useQuery<any[]>({ queryKey: ["/api/sales?pending=true"] });
+  const { data: payments, isLoading } = useQuery({
+    queryKey: ["umugwaneza", "grocery_payments", businessId],
+    queryFn: async () => {
+      const { data, error } = await db().from("grocery_payments").select("*").eq("business_id", businessId).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
+  const { data: pendingPurchases } = useQuery<any[]>({
+    queryKey: ["umugwaneza", "purchases", businessId, "pending"],
+    queryFn: async () => {
+      const { data, error } = await db().from("purchases").select("*").eq("business_id", businessId).gt("remaining_amount", 0).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
+  const { data: pendingSales } = useQuery<any[]>({
+    queryKey: ["umugwaneza", "sales", businessId, "pending"],
+    queryFn: async () => {
+      const { data, error } = await db().from("sales").select("*").eq("business_id", businessId).gt("remaining_amount", 0).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
 
   const form = useForm<InsertGroceryPayment>({
     resolver: zodResolver(insertGroceryPaymentSchema),
@@ -43,15 +68,16 @@ function GroceryPaymentsTab() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertGroceryPayment) => {
-      await apiRequest("POST", "/api/grocery-payments", values);
+      const { error } = await db().from("grocery_payments").insert({ ...values, business_id: businessId });
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/grocery-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/purchases?pending=true"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sales?pending=true"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/grocery"] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "grocery_payments", businessId] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "purchases", businessId] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "purchases", businessId, "pending"] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "sales", businessId] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "sales", businessId, "pending"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "grocery"] });
       setPaymentSuccess(true);
       setTimeout(() => { setPaymentSuccess(false); form.reset(); setOpen(false); }, 800);
       toast({ title: t("common.payment_recorded") });
@@ -182,11 +208,27 @@ function GroceryPaymentsTab() {
 function RentalPaymentsTab() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const businessId = user?.business_id ?? "biz_001";
   const [open, setOpen] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
-  const { data: rentalPayments, isLoading } = useQuery({ queryKey: ["/api/rental-payments"] });
-  const { data: pendingContracts } = useQuery<any[]>({ queryKey: ["/api/rental-contracts-pending"] });
+  const { data: rentalPayments, isLoading } = useQuery({
+    queryKey: ["umugwaneza", "rental_payments", businessId],
+    queryFn: async () => {
+      const { data, error } = await db().from("rental_payments").select("*, rental_contract:rental_contracts(*, vehicle:vehicles(*), customer:customers(*), external_owner:external_asset_owners(*))").eq("business_id", businessId).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
+  const { data: pendingContracts } = useQuery<any[]>({
+    queryKey: ["umugwaneza", "rental_contracts", businessId, "pending"],
+    queryFn: async () => {
+      const { data, error } = await db().from("rental_contracts").select("*, vehicle:vehicles(*), customer:customers(*), external_owner:external_asset_owners(*)").eq("business_id", businessId).gt("remaining_amount", 0).order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
 
   const form = useForm<InsertRentalPayment>({
     resolver: zodResolver(insertRentalPaymentSchema),
@@ -195,13 +237,14 @@ function RentalPaymentsTab() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertRentalPayment) => {
-      await apiRequest("POST", "/api/rental-payments", values);
+      const { error } = await db().from("rental_payments").insert({ ...values, business_id: businessId });
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rental-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/rental-contracts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/rental-contracts-pending"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/rental"] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "rental_payments", businessId] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "rental_contracts", businessId] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "rental_contracts", businessId, "pending"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "rental"] });
       setPaymentSuccess(true);
       setTimeout(() => { setPaymentSuccess(false); form.reset(); setOpen(false); }, 800);
       toast({ title: t("common.payment_recorded") });
