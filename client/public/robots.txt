@@ -2,5 +2,4 @@
 User-agent: *
 Allow: /
 
-# Sitemap (update base URL when deployed)
-Sitemap: /sitemap.xml
+Sitemap: https://www.umugwaneza.com/sitemap.xml
