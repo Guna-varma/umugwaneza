@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Building2, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -57,9 +58,7 @@ export default function LoginPage() {
     <div className="min-h-[100dvh] flex items-center justify-center bg-[#f8fafc] p-3 sm:p-4 md:p-6 animate-page-fade safe-area-padding">
       <div className="w-full max-w-[100%] sm:max-w-md">
         <div className="flex flex-col items-center mb-6 sm:mb-8">
-          <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-lg bg-[#2563eb] mb-3 sm:mb-4">
-            <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
-          </div>
+          <Logo size="xl" className="mb-3 sm:mb-4" />
           <h1 className="text-xl sm:text-2xl font-bold text-[#1e293b] text-center px-1" data-testid="text-app-title">{t("app.name")}</h1>
           <p className="text-xs sm:text-sm text-[#64748b] mt-1 text-center px-2">{t("app.tagline")}</p>
         </div>

@@ -14,6 +14,7 @@ import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import LandingPage from "@/pages/landing";
 import { initializeApp } from "@/lib/init";
+import { usePageMeta } from "@/lib/usePageMeta";
 import DashboardPage from "@/pages/dashboard";
 import ItemsPage from "@/pages/items";
 import SuppliersPage from "@/pages/suppliers";
@@ -30,6 +31,7 @@ import AdminBusinessesPage from "@/pages/admin-businesses";
 import AdminOwnersPage from "@/pages/admin-owners";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { NotificationBell } from "@/components/notification-bell";
+import { Logo } from "@/components/logo";
 
 function OwnerRouter() {
   return (
@@ -85,6 +87,7 @@ function AuthenticatedLayout() {
           <header className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3 border-b border-[#e2e8f0] bg-white flex-shrink-0">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <SidebarTrigger data-testid="button-sidebar-toggle" className="touch-manipulation" />
+              <Logo size="sm" inline decorative />
               <span className="text-sm font-medium text-[#1e293b] truncate">{t("app.name")}</span>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
@@ -106,6 +109,7 @@ function AuthenticatedLayout() {
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
   const [location] = useLocation();
+  usePageMeta(location);
 
   useEffect(() => {
     if (isAuthenticated) {

@@ -1,0 +1,6 @@
+# Umugwaneza – B2B platform
+User-agent: *
+Allow: /
+
+# Sitemap (update base URL when deployed)
+Sitemap: /sitemap.xml

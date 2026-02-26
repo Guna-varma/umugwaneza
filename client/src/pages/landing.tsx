@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
-import { Building2, Package, Truck, FileText } from "lucide-react";
+import { Package, Truck, FileText } from "lucide-react";
+import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 
 export default function LandingPage() {
@@ -11,9 +12,7 @@ export default function LandingPage() {
     <div className="min-h-[100dvh] bg-[#f8fafc] overflow-x-hidden">
       <header className="relative z-10 flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 md:px-12 gap-2">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="flex h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[#2563eb]">
-            <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-          </div>
+          <Logo size="lg" inline decorative />
           <span className="text-base sm:text-lg font-bold text-[#1e293b] truncate">{t("app.name")}</span>
         </div>
         <Button
@@ -35,7 +34,7 @@ export default function LandingPage() {
         <div className="relative z-10 flex flex-col items-center justify-center px-4 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24 md:pt-24 md:pb-32 text-center">
           <div className="animate-landing-fade-up">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-[#2563eb]/10 text-[#2563eb] text-xs sm:text-sm font-medium mb-6 sm:mb-8">
-              <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <Logo size="xs" inline decorative />
               Rwanda · B2B Platform
             </div>
           </div>
@@ -97,7 +96,10 @@ export default function LandingPage() {
       </div>
 
       <footer className="relative z-10 py-8 text-center border-t border-[#e2e8f0]">
-        <p className="text-sm text-[#64748b]">{t("app.copyright", { year: new Date().getFullYear() })}</p>
+        <div className="flex flex-col items-center gap-3">
+          <Logo size="sm" inline decorative />
+          <p className="text-sm text-[#64748b]">{t("app.copyright", { year: new Date().getFullYear() })}</p>
+        </div>
       </footer>
     </div>
   );

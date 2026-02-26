@@ -18,6 +18,7 @@ import {
   Building2,
   LogOut,
 } from "lucide-react";
+import { Logo } from "@/components/logo";
 import {
   Sidebar,
   SidebarContent,
@@ -86,11 +87,9 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[#2563eb]">
-            <Building2 className="h-5 w-5 text-white" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-[#1e293b]" data-testid="text-company-name">{t("app.name")}</span>
+          <Logo size="md" inline decorative />
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-semibold text-[#1e293b] truncate" data-testid="text-company-name">{t("app.name")}</span>
             <span className="text-xs text-[#64748b]">{isAdmin ? t("auth.system_admin") : t("auth.business_owner")}</span>
           </div>
         </div>
