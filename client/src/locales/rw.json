@@ -15,6 +15,11 @@
     "feature3_desc": "Gucunga amasezerano yo gukodesha, ubwishyu, n'inyandiko z'ibikorwa bya buri munsi.",
     "cta_signin": "Injira"
   },
+  "seo": {
+    "rwanda_wholesale_partner": "Umufatanyabikorwa w'Ibicuruzwa mu Rwanda",
+    "rwanda_vehicle_rental": "Gukodesha imodoka mu Rwanda",
+    "trucks_machines_rental": "Gukodesha imodoka n'imashini mu Rwanda"
+  },
   "auth": {
     "signin": "Injira",
     "signing_in": "Birakiriye…",

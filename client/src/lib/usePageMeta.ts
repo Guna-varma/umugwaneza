@@ -7,6 +7,9 @@ const SITE_NAME = "Umugwaneza";
 const routeTitleKey: Record<string, string> = {
   "/": "landing.hero_title",
   "/login": "auth.signin",
+  "/rwanda-wholesale-partner": "seo.rwanda_wholesale_partner",
+  "/rwanda-vehicle-rental": "seo.rwanda_vehicle_rental",
+  "/trucks-and-machines-rental-rwanda": "seo.trucks_machines_rental",
   "/dashboard": "dashboard.title",
   "/items": "nav.items",
   "/suppliers": "nav.suppliers",
@@ -34,13 +37,17 @@ export function usePageMeta(path: string) {
 
   useEffect(() => {
     const basePath = (path || "/").replace(/\/$/, "") || "/";
+    if (basePath === "/") {
+      document.title = "Umugwaneza | Rwanda Trusted Wholesale Partner & Vehicle Rental Company";
+      return;
+    }
     const key = routeTitleKey[basePath] ?? routeTitleKey["/"];
     const pageTitle = t(key);
     const title = pageTitle ? `${pageTitle} | ${SITE_NAME}` : `${SITE_NAME} | B2B Wholesale & Fleet Platform`;
     document.title = title;
 
     const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc && basePath !== "/" && basePath !== "/login") {
+    if (metaDesc && basePath !== "/login") {
       const desc = t("app.tagline");
       if (desc) metaDesc.setAttribute("content", desc);
     }

@@ -13,6 +13,9 @@ import "@/lib/i18n";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import LandingPage from "@/pages/landing";
+import RwandaWholesalePartnerPage from "@/pages/seo/rwanda-wholesale-partner";
+import RwandaVehicleRentalPage from "@/pages/seo/rwanda-vehicle-rental";
+import TrucksAndMachinesRentalRwandaPage from "@/pages/seo/trucks-and-machines-rental-rwanda";
 import { initializeApp } from "@/lib/init";
 import { usePageMeta } from "@/lib/usePageMeta";
 import DashboardPage from "@/pages/dashboard";
@@ -127,12 +130,11 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
-    if (location === "/login") {
-      return <LoginPage />;
-    }
-    if (location !== "/") {
-      return <Redirect to="/" />;
-    }
+    if (location === "/login") return <LoginPage />;
+    if (location === "/rwanda-wholesale-partner") return <RwandaWholesalePartnerPage />;
+    if (location === "/rwanda-vehicle-rental") return <RwandaVehicleRentalPage />;
+    if (location === "/trucks-and-machines-rental-rwanda") return <TrucksAndMachinesRentalRwandaPage />;
+    if (location !== "/") return <Redirect to="/" />;
     return <LandingPage />;
   }
 

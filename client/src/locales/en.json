@@ -15,6 +15,11 @@
     "feature3_desc": "Handle outgoing and incoming rental contracts, payments, and unified daily reports.",
     "cta_signin": "Sign In"
   },
+  "seo": {
+    "rwanda_wholesale_partner": "Rwanda Wholesale Partner",
+    "rwanda_vehicle_rental": "Rwanda Vehicle Rental",
+    "trucks_machines_rental": "Trucks and Machines Rental Rwanda"
+  },
   "auth": {
     "signin": "Sign In",
     "signing_in": "Signing in…",
