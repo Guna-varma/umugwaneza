@@ -35,6 +35,7 @@ import AdminOwnersPage from "@/pages/admin-owners";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { NotificationBell } from "@/components/notification-bell";
 import { Logo } from "@/components/logo";
+import { Analytics } from "@vercel/analytics/react";
 
 function OwnerRouter() {
   return (
@@ -148,6 +149,7 @@ function App() {
         <AuthProvider>
           <AppContent />
           <Toaster />
+          <Analytics />
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
