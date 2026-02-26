@@ -9,7 +9,6 @@
     <title>Umugwaneza | B2B Wholesale & Fleet Platform</title>
     <meta name="description" content="Umugwaneza – B2B wholesale trading, fleet management, and machinery rental. Rwanda's trusted platform for businesses." />
     <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="/" />
 
     <!-- Favicon & app icons -->
     <link rel="icon" type="image/png" href="/logo.png" sizes="32x32" />
@@ -45,6 +44,14 @@
           var tw = document.querySelector('meta[name="twitter:image"]');
           if (og) og.setAttribute("content", img);
           if (tw) tw.setAttribute("content", img);
+          var link = document.querySelector('link[rel="canonical"]');
+          if (link) link.setAttribute("href", o + "/");
+          else {
+            var l = document.createElement("link");
+            l.rel = "canonical";
+            l.href = o + "/";
+            document.head.appendChild(l);
+          }
         }
       })();
     </script>
