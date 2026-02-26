@@ -11,7 +11,7 @@ export default function LandingPage() {
     <div className="min-h-[100dvh] bg-[#f8fafc] overflow-x-hidden">
       <PublicHeader />
 
-      <div className="relative">
+      <main className="relative" id="main-content">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-[#2563eb]/5 animate-landing-blob-1" />
           <div className="absolute top-1/2 -left-32 w-[400px] h-[400px] rounded-full bg-[#2563eb]/3 animate-landing-blob-2" />
@@ -35,7 +35,7 @@ export default function LandingPage() {
           </h1>
 
           <p
-            className="mt-4 sm:mt-6 text-base sm:text-lg md:text-xl text-[#64748b] max-w-2xl leading-relaxed animate-landing-fade-up px-2"
+            className="mt-4 sm:mt-6 text-base sm:text-lg md:text-xl text-[#475569] max-w-2xl leading-relaxed animate-landing-fade-up px-2"
             style={{ animationDelay: "200ms" }}
           >
             Umugwaneza is Rwanda&apos;s trusted wholesale partner and vehicle rental company. We offer trucks, heavy machines, and bulk supply solutions for businesses across Kigali and Rwanda.
@@ -81,8 +81,8 @@ export default function LandingPage() {
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#2563eb]/10 mb-4">
                     <Icon className="h-6 w-6 text-[#2563eb]" />
                   </div>
-                  <h3 className="text-lg font-semibold text-[#1e293b] mb-2">{feature.title}</h3>
-                  <p className="text-sm text-[#64748b] leading-relaxed">{feature.desc}</p>
+                <h3 className="text-lg font-semibold text-[#1e293b] mb-2">{feature.title}</h3>
+                <p className="text-sm text-[#475569] leading-relaxed">{feature.desc}</p>
                 </a>
               );
             })}
@@ -93,7 +93,7 @@ export default function LandingPage() {
           <h2 id="wholesale-heading" className="text-2xl sm:text-3xl font-bold text-[#1e293b] mb-6 text-center">
             Wholesale Services in Rwanda
           </h2>
-          <p className="text-[#64748b] text-center max-w-3xl mx-auto mb-8">
+          <p className="text-[#475569] text-center max-w-3xl mx-auto mb-8">
             As a trusted Rwanda wholesale partner, Umugwaneza helps businesses in Kigali and across Rwanda with bulk supply, inventory management, and B2B trading. Our platform streamlines purchases, sales, and payments so you can focus on growth.
           </p>
           <div className="text-center">
@@ -107,7 +107,7 @@ export default function LandingPage() {
           <h2 id="vehicle-rental-heading" className="text-2xl sm:text-3xl font-bold text-[#1e293b] mb-6 text-center">
             Rwanda Vehicle Rental Services
           </h2>
-          <p className="text-[#64748b] text-center max-w-3xl mx-auto mb-8">
+          <p className="text-[#475569] text-center max-w-3xl mx-auto mb-8">
             From light trucks to heavy machinery, Umugwaneza provides reliable Rwanda vehicle rental for construction, logistics, and agriculture. Available across Kigali and nationwide with clear contracts and support.
           </p>
           <div className="text-center">
@@ -121,7 +121,7 @@ export default function LandingPage() {
           <h2 id="trucks-heading" className="text-2xl sm:text-3xl font-bold text-[#1e293b] mb-6 text-center">
             Trucks & Heavy Machines Rental
           </h2>
-          <p className="text-[#64748b] text-center max-w-3xl mx-auto mb-8">
+          <p className="text-[#475569] text-center max-w-3xl mx-auto mb-8">
             Umugwaneza trucks and machines rental is trusted by businesses in Rwanda for project-based and long-term use. We offer transparent pricing, maintenance support, and flexible terms.
           </p>
           <div className="text-center">
@@ -135,21 +135,21 @@ export default function LandingPage() {
           <h2 id="trusted-heading" className="text-2xl sm:text-3xl font-bold text-[#1e293b] mb-6 text-center">
             Why Umugwaneza is a Trusted Partner
           </h2>
-          <p className="text-[#64748b] text-center max-w-3xl mx-auto mb-10">
+          <p className="text-[#475569] text-center max-w-3xl mx-auto mb-10">
             Businesses across Rwanda choose Umugwaneza for wholesale and vehicle rental because we combine local presence with reliable operations, clear contracts, and dedicated support in Kigali and beyond.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="bg-white rounded-xl border border-[#e2e8f0] p-6 text-center">
               <p className="text-3xl font-bold text-[#2563eb] mb-1">B2B Focus</p>
-              <p className="text-sm text-[#64748b]">Built for wholesalers, contractors, and fleet operators in Rwanda.</p>
+              <p className="text-sm text-[#475569]">Built for wholesalers, contractors, and fleet operators in Rwanda.</p>
             </div>
             <div className="bg-white rounded-xl border border-[#e2e8f0] p-6 text-center">
               <p className="text-3xl font-bold text-[#2563eb] mb-1">Transparent</p>
-              <p className="text-sm text-[#64748b]">Clear pricing and terms for wholesale and rental.</p>
+              <p className="text-sm text-[#475569]">Clear pricing and terms for wholesale and rental.</p>
             </div>
             <div className="bg-white rounded-xl border border-[#e2e8f0] p-6 text-center">
               <p className="text-3xl font-bold text-[#2563eb] mb-1">Nationwide</p>
-              <p className="text-sm text-[#64748b]">Serving Kigali and Rwanda with consistent service.</p>
+              <p className="text-sm text-[#475569]">Serving Kigali and Rwanda with consistent service.</p>
             </div>
           </div>
         </section>
@@ -161,15 +161,15 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <blockquote className="bg-white rounded-xl border border-[#e2e8f0] p-6">
               <p className="text-[#1e293b] mb-4">&ldquo;Umugwaneza is our go-to Rwanda wholesale partner. Reliable supply and clear reporting.&rdquo;</p>
-              <footer className="text-sm text-[#64748b]">— B2B supplier, Kigali</footer>
+              <footer className="text-sm text-[#475569]">— B2B supplier, Kigali</footer>
             </blockquote>
             <blockquote className="bg-white rounded-xl border border-[#e2e8f0] p-6">
               <p className="text-[#1e293b] mb-4">&ldquo;We use Umugwaneza for trucks and machines rental. Professional and trusted.&rdquo;</p>
-              <footer className="text-sm text-[#64748b]">— Construction company, Rwanda</footer>
+              <footer className="text-sm text-[#475569]">— Construction company, Rwanda</footer>
             </blockquote>
           </div>
         </section>
-      </div>
+      </main>
 
       <PublicFooter />
     </div>

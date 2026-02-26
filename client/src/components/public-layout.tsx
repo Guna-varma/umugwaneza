@@ -13,12 +13,12 @@ export function PublicHeader() {
   const [, setLocation] = useLocation();
   return (
     <header className="relative z-10 flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 md:px-12 gap-2">
-      <a href="/" className="flex items-center gap-2 sm:gap-3 min-w-0" aria-label="Umugwaneza – Home">
+      <a href="/" className="flex items-center gap-2 sm:gap-3 min-w-0 min-h-[44px] items-center" aria-label="Umugwaneza – Home">
         <Logo size="lg" inline decorative />
         <span className="text-base sm:text-lg font-bold text-[#1e293b] truncate">Umugwaneza</span>
       </a>
       <Button
-        className="h-10 sm:h-12 px-5 sm:px-8 bg-[#2563eb] text-white text-sm sm:text-base flex-shrink-0 touch-manipulation"
+        className="min-h-[44px] min-w-[44px] h-11 sm:h-12 px-5 sm:px-8 bg-[#2563eb] text-white text-sm sm:text-base flex-shrink-0 touch-manipulation"
         onClick={() => setLocation("/login")}
         data-testid="button-landing-signin"
       >
@@ -36,7 +36,7 @@ export function PublicFooter() {
           <div className="flex flex-col items-center sm:items-start gap-2">
             <Logo size="sm" inline decorative />
             <p className="text-sm font-medium text-[#1e293b]">{NAP.name}</p>
-            <address className="text-sm text-[#64748b] not-italic text-center sm:text-left">
+            <address className="text-sm text-[#475569] not-italic text-center sm:text-left">
               {NAP.address}
               <br />
               <a href={`tel:${NAP.phone.replace(/\s/g, "")}`} className="hover:text-[#2563eb]">{NAP.phone}</a>
@@ -45,12 +45,12 @@ export function PublicFooter() {
             </address>
           </div>
           <nav className="flex flex-wrap justify-center sm:justify-end gap-4 sm:gap-6 text-sm" aria-label="Service pages">
-            <a href="/rwanda-wholesale-partner" className="text-[#64748b] hover:text-[#2563eb]">Rwanda Wholesale Partner</a>
-            <a href="/rwanda-vehicle-rental" className="text-[#64748b] hover:text-[#2563eb]">Rwanda Vehicle Rental</a>
-            <a href="/trucks-and-machines-rental-rwanda" className="text-[#64748b] hover:text-[#2563eb]">Trucks & Machines Rental</a>
+            <a href="/rwanda-wholesale-partner" className="text-[#475569] hover:text-[#2563eb] py-2 min-h-[44px] inline-flex items-center">Rwanda Wholesale Partner</a>
+            <a href="/rwanda-vehicle-rental" className="text-[#475569] hover:text-[#2563eb] py-2 min-h-[44px] inline-flex items-center">Rwanda Vehicle Rental</a>
+            <a href="/trucks-and-machines-rental-rwanda" className="text-[#475569] hover:text-[#2563eb] py-2 min-h-[44px] inline-flex items-center">Trucks & Machines Rental</a>
           </nav>
         </div>
-        <p className="text-sm text-[#64748b] text-center sm:text-left mt-6 pt-6 border-t border-[#e2e8f0]">
+        <p className="text-sm text-[#475569] text-center sm:text-left mt-6 pt-6 border-t border-[#e2e8f0]">
           © {new Date().getFullYear()} {NAP.name}. All rights reserved.
         </p>
       </div>
