@@ -29,9 +29,11 @@ import VehiclesPage from "@/pages/vehicles";
 import ExternalOwnersPage from "@/pages/external-owners";
 import RentalsPage from "@/pages/rentals";
 import ReportsPage from "@/pages/reports";
+import StockPage from "@/pages/stock";
 import NotificationsPage from "@/pages/notifications";
 import AdminBusinessesPage from "@/pages/admin-businesses";
 import AdminOwnersPage from "@/pages/admin-owners";
+import FleetCustomersPage from "@/pages/fleet-customers";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { NotificationBell } from "@/components/notification-bell";
 import { Logo } from "@/components/logo";
@@ -48,10 +50,12 @@ function OwnerRouter() {
       <Route path="/sales" component={SalesPage} />
       <Route path="/payments" component={PaymentsPage} />
       <Route path="/vehicles" component={VehiclesPage} />
+      <Route path="/fleet/customers" component={FleetCustomersPage} />
       <Route path="/external-owners" component={ExternalOwnersPage} />
       <Route path="/rentals/outgoing">{() => <RentalsPage direction="OUTGOING" />}</Route>
       <Route path="/rentals/incoming">{() => <RentalsPage direction="INCOMING" />}</Route>
       <Route path="/reports" component={ReportsPage} />
+      <Route path="/stock" component={StockPage} />
       <Route path="/notifications" component={NotificationsPage} />
       <Route path="/">{() => <Redirect to="/dashboard" />}</Route>
       <Route path="/:rest*">{() => <Redirect to="/dashboard" />}</Route>

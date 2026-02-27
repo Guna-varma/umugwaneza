@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/supabase";
@@ -35,6 +37,18 @@ function formatRWF(amount: number) {
 
 export default function DashboardPage() {
   const { t } = useTranslation();
+
+  // Run due-date reminders once per day (10:00 AM Rwanda). Idempotent; refreshes notification count.
+  useEffect(() => {
+    let cancelled = false;
+    db()
+      .rpc("process_due_date_reminders")
+      .then(({ error }) => {
+        if (!cancelled && !error) queryClient.invalidateQueries({ queryKey: ["umugwaneza", "notifications_list"] });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const { data: groceryStats, isLoading: loadingGrocery } = useQuery({
     queryKey: ["dashboard", "grocery"],

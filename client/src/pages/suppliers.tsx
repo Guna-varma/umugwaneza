@@ -17,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Users } from "lucide-react";
+import { Plus, Users, Pencil } from "lucide-react";
 
 export default function SuppliersPage() {
   const { t } = useTranslation();
@@ -25,6 +25,8 @@ export default function SuppliersPage() {
   const { user } = useAuth();
   const businessId = user?.business_id ?? "biz_001";
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
 
   const { data: suppliers, isLoading } = useQuery<Supplier[]>({
     queryKey: ["umugwaneza", "suppliers", businessId],
@@ -36,6 +38,11 @@ export default function SuppliersPage() {
   });
 
   const form = useForm<InsertSupplier>({
+    resolver: zodResolver(insertSupplierSchema),
+    defaultValues: { supplier_name: "", phone: "", address: "", notes: "" },
+  });
+
+  const editForm = useForm<InsertSupplier>({
     resolver: zodResolver(insertSupplierSchema),
     defaultValues: { supplier_name: "", phone: "", address: "", notes: "" },
   });
@@ -53,6 +60,42 @@ export default function SuppliersPage() {
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
+
+  const updateMutation = useMutation({
+    mutationFn: async (values: InsertSupplier) => {
+      if (!editingSupplier) throw new Error("No supplier selected");
+      const { error } = await db()
+        .from("suppliers")
+        .update({
+          supplier_name: values.supplier_name,
+          phone: values.phone || null,
+          address: values.address || null,
+          notes: values.notes || null,
+        })
+        .eq("id", editingSupplier.id)
+        .eq("business_id", businessId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "suppliers", businessId] });
+      toast({ title: t("common.supplier_updated") });
+      setEditOpen(false);
+      setEditingSupplier(null);
+    },
+    onError: (e: any) =>
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  const startEdit = (s: Supplier) => {
+    setEditingSupplier(s);
+    editForm.reset({
+      supplier_name: s.supplier_name,
+      phone: s.phone || "",
+      address: s.address || "",
+      notes: s.notes || "",
+    });
+    setEditOpen(true);
+  };
 
   return (
     <div className="p-6 space-y-6 animate-page-fade">
@@ -108,15 +151,33 @@ export default function SuppliersPage() {
                   <TableHead className="text-[#64748b]">{t("suppliers.phone")}</TableHead>
                   <TableHead className="text-[#64748b]">{t("suppliers.address")}</TableHead>
                   <TableHead className="text-[#64748b]">{t("suppliers.notes")}</TableHead>
+                  <TableHead className="text-right text-[#64748b]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {suppliers.map((s, i) => (
-                  <TableRow key={s.id} className="border-b border-[#e2e8f0] animate-row-slide" style={{ animationDelay: `${i * 30}ms` }} data-testid={`row-supplier-${s.id}`}>
+                  <TableRow
+                    key={s.id}
+                    className="border-b border-[#e2e8f0] animate-row-slide"
+                    style={{ animationDelay: `${i * 30}ms` }}
+                    data-testid={`row-supplier-${s.id}`}
+                  >
                     <TableCell className="font-medium text-[#1e293b]">{s.supplier_name}</TableCell>
                     <TableCell className="text-[#64748b]">{s.phone || "—"}</TableCell>
                     <TableCell className="text-[#64748b]">{s.address || "—"}</TableCell>
                     <TableCell className="text-[#64748b] max-w-[200px] truncate">{s.notes || "—"}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => startEdit(s)}
+                        data-testid={`button-edit-supplier-${s.id}`}
+                      >
+                        <Pencil className="h-3 w-3 mr-1.5" />
+                        Edit
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -124,6 +185,89 @@ export default function SuppliersPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          setEditOpen(open);
+          if (!open) setEditingSupplier(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit supplier</DialogTitle>
+          </DialogHeader>
+          {editingSupplier && (
+            <Form {...editForm}>
+              <form
+                onSubmit={editForm.handleSubmit((v) => updateMutation.mutate(v))}
+                className="space-y-4 pr-6 sm:pr-0"
+              >
+                <FormField
+                  control={editForm.control}
+                  name="supplier_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("suppliers.supplier_name")}</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-edit-supplier-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("suppliers.phone")}</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} data-testid="input-edit-supplier-phone" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("suppliers.address")}</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} data-testid="input-edit-supplier-address" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("suppliers.notes")}</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} value={field.value || ""} data-testid="input-edit-supplier-notes" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button
+                  type="submit"
+                  className="w-full h-12 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]"
+                  disabled={updateMutation.isPending}
+                  data-testid="button-update-supplier"
+                >
+                  {updateMutation.isPending ? t("common.saving") : "Update supplier"}
+                </Button>
+              </form>
+            </Form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

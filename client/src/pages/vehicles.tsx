@@ -11,15 +11,23 @@ import { useForm } from "react-hook-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
+import { AmountInput } from "@/components/ui/amount-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Truck, RefreshCw } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Plus, Truck, RefreshCw, Pencil } from "lucide-react";
 
 function statusVariant(status: string) {
   switch (status) {
@@ -38,6 +46,8 @@ export default function VehiclesPage() {
   const { user } = useAuth();
   const businessId = user?.business_id ?? "biz_001";
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [syncing, setSyncing] = useState(false);
 
   const { data: vehicles, isLoading } = useQuery<Vehicle[]>({
@@ -68,6 +78,59 @@ export default function VehiclesPage() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async (values: InsertVehicle) => {
+      if (!editingVehicle) throw new Error("No vehicle selected");
+      const { error } = await db()
+        .from("vehicles")
+        .update({
+          vehicle_name: values.vehicle_name,
+          vehicle_type: values.vehicle_type,
+          rental_type: values.rental_type,
+          ownership_type: values.ownership_type,
+          base_rate: values.base_rate,
+          current_status: values.current_status,
+          current_location: values.current_location ?? null,
+          notes: values.notes ?? null,
+        })
+        .eq("id", editingVehicle.id)
+        .eq("business_id", businessId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "vehicles", businessId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "rental"] });
+      toast({ title: t("vehicles.update_vehicle") });
+      setEditOpen(false);
+      setEditingVehicle(null);
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  const startEdit = (v: Vehicle) => {
+    setEditingVehicle(v);
+    form.reset({
+      vehicle_name: v.vehicle_name,
+      vehicle_type: v.vehicle_type,
+      rental_type: v.rental_type,
+      ownership_type: v.ownership_type,
+      base_rate: v.base_rate,
+      current_status: v.current_status,
+      current_location: v.current_location ?? "",
+      notes: v.notes ?? "",
+    });
+    setEditOpen(true);
+  };
+
+  function rentalTypeLabel(type: string) {
+    switch (type) {
+      case "DAY": return t("vehicles.day");
+      case "HOUR": return t("vehicles.hour");
+      case "MONTH": return t("vehicles.month");
+      default: return type;
+    }
+  }
+
   const handleSync = async () => {
     setSyncing(true);
     try {
@@ -94,14 +157,33 @@ export default function VehiclesPage() {
           <Button variant="outline" className="h-12 border-[#e2e8f0]" onClick={handleSync} disabled={syncing} data-testid="button-sync-vehicles">
             <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} /> {syncing ? t("vehicles.syncing") : t("vehicles.sync_vehicles")}
           </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="h-12 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]" data-testid="button-add-vehicle"><Plus className="h-4 w-4 mr-2" /> {t("vehicles.add_vehicle")}</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>{t("vehicles.add_new_vehicle")}</DialogTitle></DialogHeader>
+          <Dialog
+            open={open || editOpen}
+            onOpenChange={(isOpen) => {
+              if (!isOpen) {
+                setOpen(false);
+                setEditOpen(false);
+                setEditingVehicle(null);
+              }
+            }}
+          >
+            <Button
+              className="h-12 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]"
+              data-testid="button-add-vehicle"
+              onClick={() => {
+                form.reset({ vehicle_name: "", vehicle_type: "TRUCK", rental_type: "DAY", ownership_type: "OWN", base_rate: 0, current_status: "AVAILABLE", current_location: "", notes: "" });
+                setEditingVehicle(null);
+                setOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" /> {t("vehicles.add_vehicle")}
+            </Button>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>{editingVehicle ? t("vehicles.update_vehicle") : t("vehicles.add_new_vehicle")}</DialogTitle>
+              </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-4">
+                <form onSubmit={form.handleSubmit((v) => (editingVehicle ? updateMutation.mutate(v) : createMutation.mutate(v)))} className="space-y-4">
                   <FormField control={form.control} name="vehicle_name" render={({ field }) => (
                     <FormItem><FormLabel>{t("vehicles.vehicle_name")}</FormLabel><FormControl><Input {...field} data-testid="input-vehicle-name" /></FormControl><FormMessage /></FormItem>
                   )} />
@@ -118,7 +200,7 @@ export default function VehiclesPage() {
                       <FormItem><FormLabel>{t("vehicles.rental_type")}</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent><SelectItem value="DAY">{t("vehicles.day")}</SelectItem><SelectItem value="HOUR">{t("vehicles.hour")}</SelectItem></SelectContent>
+                          <SelectContent><SelectItem value="DAY">{t("vehicles.day")}</SelectItem><SelectItem value="HOUR">{t("vehicles.hour")}</SelectItem><SelectItem value="MONTH">{t("vehicles.month")}</SelectItem></SelectContent>
                         </Select><FormMessage />
                       </FormItem>
                     )} />
@@ -133,7 +215,7 @@ export default function VehiclesPage() {
                       </FormItem>
                     )} />
                     <FormField control={form.control} name="base_rate" render={({ field }) => (
-                      <FormItem><FormLabel>{t("vehicles.base_rate")}</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem>
+                      <FormItem><FormLabel>{t("vehicles.base_rate")}</FormLabel><FormControl><AmountInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} placeholder="0" /></FormControl><FormMessage /></FormItem>
                     )} />
                   </div>
                   <FormField control={form.control} name="current_location" render={({ field }) => (
@@ -142,8 +224,10 @@ export default function VehiclesPage() {
                   <FormField control={form.control} name="notes" render={({ field }) => (
                     <FormItem><FormLabel>{t("vehicles.notes")}</FormLabel><FormControl><Textarea {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
                   )} />
-                  <Button type="submit" className="w-full h-12 bg-[#2563eb]" disabled={createMutation.isPending} data-testid="button-submit-vehicle">
-                    {createMutation.isPending ? t("vehicles.adding") : t("vehicles.add")}
+                  <Button type="submit" className="w-full h-12 bg-[#2563eb]" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-vehicle">
+                    {editingVehicle
+                      ? (updateMutation.isPending ? t("common.loading") : t("vehicles.update_vehicle"))
+                      : (createMutation.isPending ? t("vehicles.adding") : t("vehicles.add"))}
                   </Button>
                 </form>
               </Form>
@@ -174,18 +258,39 @@ export default function VehiclesPage() {
                     <TableHead className="text-[#64748b] text-right">{t("vehicles.base_rate")}</TableHead>
                     <TableHead className="text-[#64748b]">{t("common.status")}</TableHead>
                     <TableHead className="text-[#64748b]">{t("vehicles.location")}</TableHead>
+                    <TableHead className="text-right w-[100px]">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {vehicles.map((v, i) => (
-                    <TableRow key={v.id} className="border-b border-[#e2e8f0] animate-row-slide" style={{ animationDelay: `${i * 30}ms` }} data-testid={`row-vehicle-${v.id}`}>
+                    <TableRow key={v.id} className="border-b border-[#e2e8f0] animate-row-slide hover:bg-[#f8fafc]" style={{ animationDelay: `${i * 30}ms` }} data-testid={`row-vehicle-${v.id}`}>
                       <TableCell className="font-medium text-[#1e293b]">{v.vehicle_name}</TableCell>
                       <TableCell className="text-[#64748b]">{v.vehicle_type}</TableCell>
-                      <TableCell className="text-[#64748b]">{v.rental_type}</TableCell>
+                      <TableCell className="text-[#64748b]">{rentalTypeLabel(v.rental_type)}</TableCell>
                       <TableCell className="text-[#64748b]">{v.ownership_type}</TableCell>
                       <TableCell className="text-right text-[#1e293b]">{new Intl.NumberFormat("en-RW").format(v.base_rate)}</TableCell>
                       <TableCell><Badge variant={statusVariant(v.current_status)}>{v.current_status.replace("_", " ")}</Badge></TableCell>
                       <TableCell className="text-[#64748b]">{v.current_location || "—"}</TableCell>
+                      <TableCell className="text-right">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-2.5"
+                                onClick={() => startEdit(v)}
+                                data-testid={`button-edit-vehicle-${v.id}`}
+                                aria-label={t("vehicles.edit_vehicle")}
+                              >
+                                <Pencil className="h-3.5 w-3 mr-1.5" />
+                                {t("vehicles.edit_vehicle")}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="left"><p>{t("vehicles.update_vehicle")}</p></TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

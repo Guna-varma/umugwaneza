@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/useAuth";
 import {
   LayoutDashboard,
   Package,
+  Layers,
   Users,
   UserCheck,
   ShoppingCart,
@@ -47,32 +48,34 @@ export function AppSidebar() {
       label: t("nav.overview"),
       items: [
         { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard },
+        { title: t("nav.payments"), url: "/payments", icon: CreditCard },
+        { title: t("nav.reports"), url: "/reports", icon: FileText },
       ],
     },
     {
       label: t("nav.grocery"),
       items: [
         { title: t("nav.items"), url: "/items", icon: Package },
+        { title: t("nav.stock"), url: "/stock", icon: Layers },
         { title: t("nav.suppliers"), url: "/suppliers", icon: Users },
         { title: t("nav.customers"), url: "/customers", icon: UserCheck },
         { title: t("nav.purchases"), url: "/purchases", icon: ShoppingCart },
         { title: t("nav.sales"), url: "/sales", icon: TrendingUp },
-        { title: t("nav.payments"), url: "/payments", icon: CreditCard },
       ],
     },
     {
       label: t("nav.fleet_rental"),
       items: [
         { title: t("nav.vehicles"), url: "/vehicles", icon: Truck },
+        { title: t("nav.fleet_customers"), url: "/fleet/customers", icon: UserCheck },
         { title: t("nav.external_owners"), url: "/external-owners", icon: UserPlus },
         { title: t("nav.outgoing_rental"), url: "/rentals/outgoing", icon: ArrowUpRight },
         { title: t("nav.incoming_rental"), url: "/rentals/incoming", icon: ArrowDownLeft },
       ],
     },
     {
-      label: t("nav.reporting"),
+      label: t("nav.others"),
       items: [
-        { title: t("nav.reports"), url: "/reports", icon: FileText },
         { title: t("nav.notifications"), url: "/notifications", icon: Bell },
       ],
     },

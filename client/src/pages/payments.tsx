@@ -11,6 +11,8 @@ import { useForm } from "react-hook-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
+import { AmountInput } from "@/components/ui/amount-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -92,7 +94,7 @@ function GroceryPaymentsTab() {
       <div className="flex justify-end">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="h-12 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]" data-testid="button-add-grocery-payment"><Plus className="h-4 w-4 mr-2" /> {t("payments.record_payment")}</Button>
+            <Button className="w-full sm:w-auto min-h-[44px] h-12 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02] touch-manipulation" data-testid="button-add-grocery-payment"><Plus className="h-4 w-4 mr-2" /> {t("payments.record_payment")}</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{t("payments.record_payment")}</DialogTitle></DialogHeader>
@@ -103,7 +105,7 @@ function GroceryPaymentsTab() {
               </div>
             ) : (
               <Form {...form}>
-                <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-4">
+                <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-4 pr-6 sm:pr-0">
                   <FormField control={form.control} name="reference_type" render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("payments.payment_for")}</FormLabel>
@@ -132,7 +134,7 @@ function GroceryPaymentsTab() {
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="amount" render={({ field }) => (
-                    <FormItem><FormLabel>{t("payments.amount_rwf")}</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-payment-amount" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>{t("payments.amount_rwf")}</FormLabel><FormControl><AmountInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} step={0.01} placeholder="0" data-testid="input-payment-amount" /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="payment_date" render={({ field }) => (
                     <FormItem><FormLabel>{t("payments.date")}</FormLabel><FormControl><Input type="date" {...field} data-testid="input-payment-date" /></FormControl><FormMessage /></FormItem>
@@ -268,7 +270,7 @@ function RentalPaymentsTab() {
               </div>
             ) : (
               <Form {...form}>
-                <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-4">
+                <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-4 pr-6 sm:pr-0">
                   <FormField control={form.control} name="rental_contract_id" render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("payments.rental_contract")}</FormLabel>
@@ -285,9 +287,9 @@ function RentalPaymentsTab() {
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <FormField control={form.control} name="amount" render={({ field }) => (
-                    <FormItem><FormLabel>{t("payments.amount_rwf")}</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} data-testid="input-rental-payment-amount" /></FormControl><FormMessage /></FormItem>
-                  )} />
+<FormField control={form.control} name="amount" render={({ field }) => (
+                  <FormItem><FormLabel>{t("payments.amount_rwf")}</FormLabel><FormControl><AmountInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} step={0.01} placeholder="0" data-testid="input-rental-payment-amount" /></FormControl><FormMessage /></FormItem>
+                )} />
                   <FormField control={form.control} name="payment_date" render={({ field }) => (
                     <FormItem><FormLabel>{t("payments.date")}</FormLabel><FormControl><Input type="date" {...field} data-testid="input-rental-payment-date" /></FormControl><FormMessage /></FormItem>
                   )} />
@@ -365,10 +367,10 @@ export default function PaymentsPage() {
   const { t } = useTranslation();
 
   return (
-    <div className="p-6 space-y-6 animate-page-fade">
-      <div>
-        <h1 className="text-2xl font-bold text-[#1e293b]" data-testid="text-page-title">{t("payments.title")}</h1>
-        <p className="text-sm text-[#64748b]">{t("payments.subtitle")}</p>
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 animate-page-fade max-w-full overflow-x-hidden">
+      <div className="min-w-0">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#1e293b] truncate" data-testid="text-page-title">{t("payments.title")}</h1>
+        <p className="text-sm text-[#64748b] mt-0.5">{t("payments.subtitle")}</p>
       </div>
 
       <Tabs defaultValue="grocery" className="w-full">

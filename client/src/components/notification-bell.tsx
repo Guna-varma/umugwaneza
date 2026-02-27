@@ -4,15 +4,23 @@ import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { db } from "@/lib/supabase";
 
+function parseNotificationsList(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  if (data != null && typeof data === "object") {
+    const v = Object.values(data)[0];
+    return Array.isArray(v) ? v : [];
+  }
+  return [];
+}
+
 export function NotificationBell() {
   const [, setLocation] = useLocation();
   const { data: notifications } = useQuery<any[]>({
-    queryKey: ["umugwaneza", "recent_activity"],
+    queryKey: ["umugwaneza", "notifications_list"],
     queryFn: async () => {
-      const { data, error } = await db().rpc("get_recent_activity", { p_limit: 50 }).single();
+      const { data, error } = await db().rpc("notifications_list", { p_limit: 50 });
       if (error) throw new Error(error.message);
-      const list = data != null && typeof data === "object" && !Array.isArray(data) ? (Object.values(data)[0] as any) : data;
-      return Array.isArray(list) ? list : [];
+      return parseNotificationsList(data);
     },
     refetchInterval: 30000,
   });

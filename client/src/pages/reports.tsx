@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Download, Search } from "lucide-react";
 
 function formatRWF(amount: number) {
@@ -28,11 +29,19 @@ const REPORT_TYPES = [
   { value: "stock_summary", group: "grocery" },
   { value: "supplier_ledger", group: "grocery" },
   { value: "customer_ledger", group: "grocery" },
+  { value: "daily", group: "rental" },
+  { value: "monthly", group: "rental" },
+  { value: "custom", group: "rental" },
   { value: "rental_outgoing", group: "rental" },
   { value: "rental_incoming", group: "rental" },
   { value: "vehicle_utilization", group: "rental" },
   { value: "rental_profit", group: "rental" },
 ];
+
+type ReportGroup = "grocery" | "rental";
+
+const GROCERY_REPORT_TYPES = REPORT_TYPES.filter((rt) => rt.group === "grocery");
+const RENTAL_REPORT_TYPES = REPORT_TYPES.filter((rt) => rt.group === "rental");
 
 export default function ReportsPage() {
   const { t } = useTranslation();
@@ -49,6 +58,7 @@ export default function ReportsPage() {
   const [supplierId, setSupplierId] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [generateKey, setGenerateKey] = useState("");
+  const [activeGroup, setActiveGroup] = useState<ReportGroup>("grocery");
 
   const { data: suppliers } = useQuery({
     queryKey: ["umugwaneza", "suppliers"],
@@ -67,22 +77,37 @@ export default function ReportsPage() {
     },
   });
 
+  /** Supabase may return JSONB RPC result as the object or as [object]; normalize for consistent use. */
+  function normalizeReportPayload(data: any): any {
+    if (data == null) return data;
+    let out = Array.isArray(data) && data.length > 0 ? data[0] : data;
+    if (out && typeof out === "object" && !Array.isArray(out) && Object.keys(out).length === 1) {
+      const val = Object.values(out)[0];
+      if (val && typeof val === "object") out = val;
+    }
+    return out;
+  }
+
   async function fetchReport(): Promise<any> {
+    let data: any;
     switch (reportType) {
       case "daily": {
-        const { data, error } = await db().rpc("report_daily", { p_date: selectedDate });
-        if (error) throw new Error(error.message);
-        return data;
+        const res = await db().rpc("report_daily", { p_date: selectedDate });
+        if (res.error) throw new Error(res.error.message);
+        data = res.data;
+        return normalizeReportPayload(data);
       }
       case "monthly": {
-        const { data, error } = await db().rpc("report_monthly", { p_month: parseInt(selectedMonth, 10), p_year: parseInt(selectedYear, 10) });
-        if (error) throw new Error(error.message);
-        return data;
+        const res = await db().rpc("report_monthly", { p_month: parseInt(selectedMonth, 10), p_year: parseInt(selectedYear, 10) });
+        if (res.error) throw new Error(res.error.message);
+        data = res.data;
+        return normalizeReportPayload(data);
       }
       case "custom": {
-        const { data, error } = await db().rpc("report_custom", { p_from: fromDate, p_to: toDate });
-        if (error) throw new Error(error.message);
-        return data;
+        const res = await db().rpc("report_custom", { p_from: fromDate, p_to: toDate });
+        if (res.error) throw new Error(res.error.message);
+        data = res.data;
+        return normalizeReportPayload(data);
       }
       case "purchases": {
         const supId = supplierId && supplierId !== "all" ? supplierId : null;
@@ -149,9 +174,9 @@ export default function ReportsPage() {
         return data;
       }
       default: {
-        const { data, error } = await db().rpc("report_daily", { p_date: selectedDate });
-        if (error) throw new Error(error.message);
-        return data;
+        const res = await db().rpc("report_daily", { p_date: selectedDate });
+        if (res.error) throw new Error(res.error.message);
+        return normalizeReportPayload(res.data);
       }
     }
   }
@@ -172,6 +197,18 @@ export default function ReportsPage() {
   const needsCustomer = ["sales", "outstanding_receivables", "customer_ledger"].includes(reportType);
   const requiresSupplier = reportType === "supplier_ledger";
   const requiresCustomer = reportType === "customer_ledger";
+
+  const visibleReportTypes = activeGroup === "grocery" ? GROCERY_REPORT_TYPES : RENTAL_REPORT_TYPES;
+
+  function handleGroupChange(group: ReportGroup) {
+    setActiveGroup(group);
+    const allowed = group === "grocery" ? GROCERY_REPORT_TYPES : RENTAL_REPORT_TYPES;
+    if (!allowed.some((rt) => rt.value === reportType)) {
+      const fallback = group === "grocery" ? "daily" : (RENTAL_REPORT_TYPES[0]?.value ?? "rental_outgoing");
+      setReportType(fallback);
+    }
+    setGenerateKey("");
+  }
 
   function getCsvFilename() {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -208,8 +245,13 @@ export default function ReportsPage() {
     const csvRows: string[] = [];
     const cols = getColumns();
     csvRows.push(cols.map(c => escapeCsvCell(c.label)).join(","));
-    const rows = reportData?.rows || [];
-    for (const row of rows) {
+    let rowsToExport: any[] = reportData?.rows || [];
+    if (activeGroup === "grocery" && ["daily", "monthly", "custom"].includes(reportType)) {
+      rowsToExport = rowsToExport.filter((r: any) => r.type !== "Rental Out" && r.type !== "Rental In");
+    } else if (activeGroup === "rental" && ["daily", "monthly", "custom"].includes(reportType)) {
+      rowsToExport = rowsToExport.filter((r: any) => r.type === "Rental Out" || r.type === "Rental In");
+    }
+    for (const row of rowsToExport) {
       csvRows.push(cols.map(c => escapeCsvCell(row[c.key])).join(","));
     }
     const summaryLines = getSummaryLines();
@@ -347,6 +389,24 @@ export default function ReportsPage() {
 
   function getSummaryLines(): { label: string; value: string }[] {
     if (!reportData) return [];
+    if (activeGroup === "rental" && ["daily", "monthly", "custom"].includes(reportType)) {
+      const rev = reportData.totalRentalRevenue || 0;
+      const cost = reportData.totalRentalCost || 0;
+      return [
+        { label: t("reports.total_rental_revenue"), value: formatRWF(rev) },
+        { label: t("reports.total_rental_cost"), value: formatRWF(cost) },
+        { label: t("reports.net_profit"), value: formatRWF(rev - cost) },
+      ];
+    }
+    if (activeGroup === "grocery" && ["daily", "monthly", "custom"].includes(reportType)) {
+      const purchase = reportData.totalPurchase || 0;
+      const sales = reportData.totalSales || 0;
+      return [
+        { label: t("reports.total_purchases"), value: formatRWF(purchase) },
+        { label: t("reports.total_sales"), value: formatRWF(sales) },
+        { label: t("reports.net_profit"), value: formatRWF(sales - purchase) },
+      ];
+    }
     switch (reportType) {
       case "daily": case "monthly": case "custom":
         return [
@@ -354,8 +414,6 @@ export default function ReportsPage() {
           { label: t("reports.total_sales"), value: formatRWF(reportData.totalSales || 0) },
           { label: t("reports.total_rental_revenue"), value: formatRWF(reportData.totalRentalRevenue || 0) },
           { label: t("reports.total_rental_cost"), value: formatRWF(reportData.totalRentalCost || 0) },
-          { label: t("reports.col_outstanding_payables"), value: formatRWF(reportData.totalOutstandingPayables || 0) },
-          { label: t("reports.col_outstanding_receivables"), value: formatRWF(reportData.totalOutstandingReceivables || 0) },
           { label: t("reports.net_profit"), value: formatRWF(reportData.netProfit || 0) },
         ];
       case "purchases":
@@ -420,12 +478,219 @@ export default function ReportsPage() {
 
   const columns = getColumns();
   const summaryLines = getSummaryLines();
-  const rows = reportData?.rows || [];
+  const rawRows: any[] = reportData?.rows || [];
+  const isRentalUnified = activeGroup === "rental" && ["daily", "monthly", "custom"].includes(reportType);
+  const isGroceryUnified = activeGroup === "grocery" && ["daily", "monthly", "custom"].includes(reportType);
+  const rows = isRentalUnified
+    ? rawRows.filter((r: any) => r.type === "Rental Out" || r.type === "Rental In")
+    : isGroceryUnified
+      ? rawRows.filter((r: any) => r.type !== "Rental Out" && r.type !== "Rental In")
+      : rawRows;
   const hasReport = !!reportData;
+  const reportError = hasReport && reportData?.error ? String(reportData.error) : null;
   const hasRows = rows.length > 0;
   const hasSummaryOnly = reportType === "rental_profit" && hasReport;
   const canDownloadCsv = hasReport;
   const canGenerate = reportType === "supplier_ledger" ? !!supplierId : reportType === "customer_ledger" ? !!customerId : true;
+
+  function renderReportContent() {
+    return (
+      <>
+        <Card className="border border-[#e2e8f0] bg-white">
+          <CardContent className="p-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div>
+                <Label className="text-sm text-[#64748b]">{t("reports.report_type")}</Label>
+                <Select value={reportType} onValueChange={(v) => { setReportType(v); setGenerateKey(""); }}>
+                  <SelectTrigger data-testid="select-report-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {visibleReportTypes.map((rt) => (
+                      <SelectItem key={rt.value} value={rt.value}>
+                        {t(`reports.type_${rt.value}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {reportType === "daily" && (
+                <div>
+                  <Label className="text-sm text-[#64748b]">{t("reports.date")}</Label>
+                  <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="border-[#e2e8f0]" data-testid="input-report-date" />
+                </div>
+              )}
+
+              {reportType === "monthly" && (
+                <>
+                  <div>
+                    <Label className="text-sm text-[#64748b]">{t("reports.filter_month")}</Label>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                      <SelectTrigger data-testid="select-month"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => (
+                          <SelectItem key={i + 1} value={String(i + 1)}>{t(`reports.month_${i + 1}`)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-[#64748b]">{t("reports.filter_year")}</Label>
+                    <Input type="number" value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="border-[#e2e8f0]" data-testid="input-year" />
+                  </div>
+                </>
+              )}
+
+              {needsDateRange && (
+                <>
+                  <div>
+                    <Label className="text-sm text-[#64748b]">{t("reports.from_date")}</Label>
+                    <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="border-[#e2e8f0]" data-testid="input-from-date" />
+                  </div>
+                  <div>
+                    <Label className="text-sm text-[#64748b]">{t("reports.to_date")}</Label>
+                    <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="border-[#e2e8f0]" data-testid="input-to-date" />
+                  </div>
+                </>
+              )}
+
+              {needsSupplier && (
+                <div>
+                  <Label className="text-sm text-[#64748b]">{t("reports.filter_supplier")}{requiresSupplier ? " *" : ""}</Label>
+                  <Select value={supplierId} onValueChange={setSupplierId}>
+                    <SelectTrigger data-testid="select-supplier"><SelectValue placeholder={t("reports.select_all")} /></SelectTrigger>
+                    <SelectContent>
+                      {!requiresSupplier && <SelectItem value="all">{t("reports.select_all")}</SelectItem>}
+                      {(suppliers as any[])?.map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {needsCustomer && (
+                <div>
+                  <Label className="text-sm text-[#64748b]">{t("reports.filter_customer")}{requiresCustomer ? " *" : ""}</Label>
+                  <Select value={customerId} onValueChange={setCustomerId}>
+                    <SelectTrigger data-testid="select-customer"><SelectValue placeholder={t("reports.select_all")} /></SelectTrigger>
+                    <SelectContent>
+                      {!requiresCustomer && <SelectItem value="all">{t("reports.select_all")}</SelectItem>}
+                      {(customers as any[])?.map((c: any) => (
+                        <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button className="h-10 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]" onClick={handleGenerate} disabled={!canGenerate} data-testid="button-generate">
+                <Search className="h-4 w-4 mr-2" /> {t("reports.generate")}
+              </Button>
+              <Button variant="outline" className="h-10 border-[#e2e8f0]" onClick={downloadCSV} disabled={!canDownloadCsv} data-testid="button-download-csv" title={canDownloadCsv ? t("reports.download_csv") : t("reports.generate_first_hint")}>
+                <Download className="h-4 w-4 mr-2" /> {t("reports.download_csv")}
+              </Button>
+              {!hasReport && <span className="text-sm text-[#64748b]">{t("reports.generate_first_hint")}</span>}
+            </div>
+          </CardContent>
+        </Card>
+
+        {reportType === "rental_profit" && reportData ? (
+          <Card className="border border-[#e2e8f0] bg-white">
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center p-4 bg-[#f1f5f9] rounded-lg">
+                  <p className="text-sm text-[#64748b]">{t("reports.col_total_revenue")}</p>
+                  <p className="text-2xl font-bold text-[#1e293b]">{formatRWF(reportData.totalRevenue || 0)} RWF</p>
+                  <p className="text-xs text-[#64748b]">{reportData.outgoingCount || 0} {t("reports.contracts")}</p>
+                </div>
+                <div className="text-center p-4 bg-[#f1f5f9] rounded-lg">
+                  <p className="text-sm text-[#64748b]">{t("reports.col_total_cost")}</p>
+                  <p className="text-2xl font-bold text-[#1e293b]">{formatRWF(reportData.totalCost || 0)} RWF</p>
+                  <p className="text-xs text-[#64748b]">{reportData.incomingCount || 0} {t("reports.contracts")}</p>
+                </div>
+                <div className="text-center p-4 bg-[#2563eb]/10 rounded-lg">
+                  <p className="text-sm text-[#64748b]">{t("reports.net_profit")}</p>
+                  <p className={`text-2xl font-bold ${(reportData.netProfit || 0) >= 0 ? "text-green-700" : "text-red-600"}`}>{formatRWF(reportData.netProfit || 0)} RWF</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border border-[#e2e8f0] bg-white">
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="p-6 space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            ) : !hasReport ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <FileText className="h-12 w-12 text-[#64748b] mb-4" />
+                <p className="text-[#1e293b] font-medium">{t("reports.generate_first_hint")}</p>
+                <p className="text-sm text-[#64748b]">{t("reports.subtitle")}</p>
+              </div>
+            ) : reportError ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <FileText className="h-12 w-12 text-[#64748b] mb-4" />
+                <p className="text-[#1e293b] font-medium">{t("reports.no_data")}</p>
+                <p className="text-sm text-red-600">{reportError}</p>
+              </div>
+            ) : !hasRows && !hasSummaryOnly ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <FileText className="h-12 w-12 text-[#64748b] mb-4" />
+                  <p className="text-[#1e293b] font-medium">{t("reports.no_data")}</p>
+                  <p className="text-sm text-[#64748b]">{t("reports.select_different_date")}</p>
+                  {summaryLines.length > 0 && (
+                    <div className="mt-4 text-left w-full max-w-sm border border-[#e2e8f0] rounded-lg p-4 bg-[#f8fafc]">
+                      <p className="text-sm font-medium text-[#1e293b] mb-2">{t("reports.totals")}</p>
+                      {summaryLines.map((line, i) => (
+                        <p key={i} className="text-sm text-[#64748b] flex justify-between"><span>{line.label}</span><span className="font-medium text-[#1e293b]">{line.value}</span></p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-b border-[#e2e8f0]">
+                        {columns.map((col) => (
+                          <TableHead key={col.key} className={`text-[#64748b] ${col.align === "right" ? "text-right" : ""}`}>{col.label}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((row: any, i: number) => (
+                        <TableRow key={i} className="border-b border-[#e2e8f0] animate-row-slide" style={{ animationDelay: `${i * 30}ms` }}>
+                          {columns.map((col) => (
+                            <TableCell key={col.key} className={`${col.align === "right" ? "text-right" : ""} text-[#1e293b]`}>
+                              {formatCellValue(col.key, row[col.key])}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                      {summaryLines.length > 0 && (
+                        <>
+                          <TableRow className="bg-[#f1f5f9] font-bold border-t-2 border-[#e2e8f0]">
+                            <TableCell colSpan={columns.length} className="text-[#1e293b]">{t("reports.totals")}</TableCell>
+                          </TableRow>
+                          {summaryLines.map((line, i) => (
+                            <TableRow key={`summary-${i}`} className={`bg-[#f1f5f9] ${i === summaryLines.length - 1 ? "border-t-2 border-[#e2e8f0] font-bold text-base" : ""}`}>
+                              <TableCell colSpan={Math.max(1, columns.length - 1)} className="text-[#64748b] font-medium">{line.label}</TableCell>
+                              <TableCell className="text-right font-bold text-[#1e293b]">{line.value}</TableCell>
+                            </TableRow>
+                          ))}
+                        </>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 animate-page-fade">
@@ -436,202 +701,22 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <Card className="border border-[#e2e8f0] bg-white">
-        <CardContent className="p-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div>
-              <Label className="text-sm text-[#64748b]">{t("reports.report_type")}</Label>
-              <Select value={reportType} onValueChange={(v) => { setReportType(v); setGenerateKey(""); }}>
-                <SelectTrigger data-testid="select-report-type"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">{t("reports.type_daily")}</SelectItem>
-                  <SelectItem value="monthly">{t("reports.type_monthly")}</SelectItem>
-                  <SelectItem value="custom">{t("reports.type_custom")}</SelectItem>
-                  <SelectItem value="purchases">{t("reports.type_purchases")}</SelectItem>
-                  <SelectItem value="sales">{t("reports.type_sales")}</SelectItem>
-                  <SelectItem value="profit">{t("reports.type_profit")}</SelectItem>
-                  <SelectItem value="outstanding_payables">{t("reports.type_outstanding_payables")}</SelectItem>
-                  <SelectItem value="outstanding_receivables">{t("reports.type_outstanding_receivables")}</SelectItem>
-                  <SelectItem value="stock_summary">{t("reports.type_stock_summary")}</SelectItem>
-                  <SelectItem value="supplier_ledger">{t("reports.type_supplier_ledger")}</SelectItem>
-                  <SelectItem value="customer_ledger">{t("reports.type_customer_ledger")}</SelectItem>
-                  <SelectItem value="rental_outgoing">{t("reports.type_rental_outgoing")}</SelectItem>
-                  <SelectItem value="rental_incoming">{t("reports.type_rental_incoming")}</SelectItem>
-                  <SelectItem value="vehicle_utilization">{t("reports.type_vehicle_utilization")}</SelectItem>
-                  <SelectItem value="rental_profit">{t("reports.type_rental_profit")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {reportType === "daily" && (
-              <div>
-                <Label className="text-sm text-[#64748b]">{t("reports.date")}</Label>
-                <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="border-[#e2e8f0]" data-testid="input-report-date" />
-              </div>
-            )}
-
-            {reportType === "monthly" && (
-              <>
-                <div>
-                  <Label className="text-sm text-[#64748b]">{t("reports.filter_month")}</Label>
-                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger data-testid="select-month"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => (
-                        <SelectItem key={i + 1} value={String(i + 1)}>{t(`reports.month_${i + 1}`)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-sm text-[#64748b]">{t("reports.filter_year")}</Label>
-                  <Input type="number" value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="border-[#e2e8f0]" data-testid="input-year" />
-                </div>
-              </>
-            )}
-
-            {needsDateRange && (
-              <>
-                <div>
-                  <Label className="text-sm text-[#64748b]">{t("reports.from_date")}</Label>
-                  <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="border-[#e2e8f0]" data-testid="input-from-date" />
-                </div>
-                <div>
-                  <Label className="text-sm text-[#64748b]">{t("reports.to_date")}</Label>
-                  <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="border-[#e2e8f0]" data-testid="input-to-date" />
-                </div>
-              </>
-            )}
-
-            {needsSupplier && (
-              <div>
-                <Label className="text-sm text-[#64748b]">{t("reports.filter_supplier")}{requiresSupplier ? " *" : ""}</Label>
-                <Select value={supplierId} onValueChange={setSupplierId}>
-                  <SelectTrigger data-testid="select-supplier"><SelectValue placeholder={t("reports.select_all")} /></SelectTrigger>
-                  <SelectContent>
-                    {!requiresSupplier && <SelectItem value="all">{t("reports.select_all")}</SelectItem>}
-                    {(suppliers as any[])?.map((s: any) => (
-                      <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {needsCustomer && (
-              <div>
-                <Label className="text-sm text-[#64748b]">{t("reports.filter_customer")}{requiresCustomer ? " *" : ""}</Label>
-                <Select value={customerId} onValueChange={setCustomerId}>
-                  <SelectTrigger data-testid="select-customer"><SelectValue placeholder={t("reports.select_all")} /></SelectTrigger>
-                  <SelectContent>
-                    {!requiresCustomer && <SelectItem value="all">{t("reports.select_all")}</SelectItem>}
-                    {(customers as any[])?.map((c: any) => (
-                      <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Button className="h-10 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]" onClick={handleGenerate} disabled={!canGenerate} data-testid="button-generate">
-              <Search className="h-4 w-4 mr-2" /> {t("reports.generate")}
-            </Button>
-            <Button variant="outline" className="h-10 border-[#e2e8f0]" onClick={downloadCSV} disabled={!canDownloadCsv} data-testid="button-download-csv" title={canDownloadCsv ? t("reports.download_csv") : t("reports.generate_first_hint")}>
-              <Download className="h-4 w-4 mr-2" /> {t("reports.download_csv")}
-            </Button>
-            {!hasReport && <span className="text-sm text-[#64748b]">{t("reports.generate_first_hint")}</span>}
-          </div>
-        </CardContent>
-      </Card>
-
-      {reportType === "rental_profit" && reportData ? (
-        <Card className="border border-[#e2e8f0] bg-white">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center p-4 bg-[#f1f5f9] rounded-lg">
-                <p className="text-sm text-[#64748b]">{t("reports.col_total_revenue")}</p>
-                <p className="text-2xl font-bold text-[#1e293b]">{formatRWF(reportData.totalRevenue || 0)} RWF</p>
-                <p className="text-xs text-[#64748b]">{reportData.outgoingCount || 0} {t("reports.contracts")}</p>
-              </div>
-              <div className="text-center p-4 bg-[#f1f5f9] rounded-lg">
-                <p className="text-sm text-[#64748b]">{t("reports.col_total_cost")}</p>
-                <p className="text-2xl font-bold text-[#1e293b]">{formatRWF(reportData.totalCost || 0)} RWF</p>
-                <p className="text-xs text-[#64748b]">{reportData.incomingCount || 0} {t("reports.contracts")}</p>
-              </div>
-              <div className="text-center p-4 bg-[#2563eb]/10 rounded-lg">
-                <p className="text-sm text-[#64748b]">{t("reports.net_profit")}</p>
-                <p className={`text-2xl font-bold ${(reportData.netProfit || 0) >= 0 ? "text-green-700" : "text-red-600"}`}>{formatRWF(reportData.netProfit || 0)} RWF</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="border border-[#e2e8f0] bg-white">
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="p-6 space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-            ) : !hasReport ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <FileText className="h-12 w-12 text-[#64748b] mb-4" />
-                <p className="text-[#1e293b] font-medium">{t("reports.generate_first_hint")}</p>
-                <p className="text-sm text-[#64748b]">{t("reports.subtitle")}</p>
-              </div>
-            ) : !hasRows && !hasSummaryOnly ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <FileText className="h-12 w-12 text-[#64748b] mb-4" />
-                <p className="text-[#1e293b] font-medium">{t("reports.no_data")}</p>
-                <p className="text-sm text-[#64748b]">{t("reports.select_different_date")}</p>
-                {summaryLines.length > 0 && (
-                  <div className="mt-4 text-left w-full max-w-sm border border-[#e2e8f0] rounded-lg p-4 bg-[#f8fafc]">
-                    <p className="text-sm font-medium text-[#1e293b] mb-2">{t("reports.totals")}</p>
-                    {summaryLines.map((line, i) => (
-                      <p key={i} className="text-sm text-[#64748b] flex justify-between"><span>{line.label}</span><span className="font-medium text-[#1e293b]">{line.value}</span></p>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-b border-[#e2e8f0]">
-                      {columns.map((col) => (
-                        <TableHead key={col.key} className={`text-[#64748b] ${col.align === "right" ? "text-right" : ""}`}>{col.label}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((row: any, i: number) => (
-                      <TableRow key={i} className="border-b border-[#e2e8f0] animate-row-slide" style={{ animationDelay: `${i * 30}ms` }}>
-                        {columns.map((col) => (
-                          <TableCell key={col.key} className={`${col.align === "right" ? "text-right" : ""} text-[#1e293b]`}>
-                            {formatCellValue(col.key, row[col.key])}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                    {summaryLines.length > 0 && (
-                      <>
-                        <TableRow className="bg-[#f1f5f9] font-bold border-t-2 border-[#e2e8f0]">
-                          <TableCell colSpan={columns.length} className="text-[#1e293b]">{t("reports.totals")}</TableCell>
-                        </TableRow>
-                        {summaryLines.map((line, i) => (
-                          <TableRow key={`summary-${i}`} className={`bg-[#f1f5f9] ${i === summaryLines.length - 1 ? "border-t-2 border-[#e2e8f0] font-bold text-base" : ""}`}>
-                            <TableCell colSpan={Math.max(1, columns.length - 1)} className="text-[#64748b] font-medium">{line.label}</TableCell>
-                            <TableCell className="text-right font-bold text-[#1e293b]">{line.value}</TableCell>
-                          </TableRow>
-                        ))}
-                      </>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <Tabs value={activeGroup} onValueChange={(v) => handleGroupChange(v as ReportGroup)} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="grocery" data-testid="tab-grocery-reports">
+            <FileText className="h-4 w-4 mr-2" /> {t("reports.grocery_tab")}
+          </TabsTrigger>
+          <TabsTrigger value="rental" data-testid="tab-rental-reports">
+            <FileText className="h-4 w-4 mr-2" /> {t("reports.rental_tab")}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="grocery" className="mt-4 space-y-6">
+          {renderReportContent()}
+        </TabsContent>
+        <TabsContent value="rental" className="mt-4 space-y-6">
+          {renderReportContent()}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

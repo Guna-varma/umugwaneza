@@ -37,6 +37,7 @@ export type Customer = {
   phone: string | null;
   address: string | null;
   notes: string | null;
+  segment: "GROCERY" | "FLEET";
   created_at: string;
   updated_at: string;
 };
@@ -52,9 +53,12 @@ export type Purchase = {
   unit: string;
   unit_price: number;
   total_purchase_cost: number;
+  package_size: number | null;
+  package_count: number | null;
   amount_paid: number;
   remaining_amount: number;
   financial_status: "PENDING" | "PARTIAL" | "FULLY_SETTLED";
+  amount_due_date: string | null;
   created_at: string;
   updated_at: string;
   supplier?: Supplier;
@@ -72,9 +76,12 @@ export type Sale = {
   unit: string;
   unit_price: number;
   total_sale_amount: number;
+  package_size: number | null;
+  package_count: number | null;
   amount_received: number;
   remaining_amount: number;
   financial_status: "PENDING" | "PARTIAL" | "FULLY_RECEIVED";
+  amount_due_date: string | null;
   created_at: string;
   updated_at: string;
   customer?: Customer;
@@ -110,7 +117,7 @@ export type Vehicle = {
   hapyjo_vehicle_id: string | null;
   vehicle_name: string;
   vehicle_type: "TRUCK" | "MACHINE";
-  rental_type: "DAY" | "HOUR";
+  rental_type: "DAY" | "HOUR" | "MONTH";
   ownership_type: "OWN" | "EXTERNAL";
   base_rate: number;
   current_status: "AVAILABLE" | "RENTED_OUT" | "RENTED_IN" | "MAINTENANCE" | "OFFLINE";
@@ -125,6 +132,7 @@ export type RentalContract = {
   business_id: string;
   vehicle_id: string;
   rental_direction: "OUTGOING" | "INCOMING";
+  rental_type: "DAY" | "HOUR" | "MONTH" | null;
   customer_id: string | null;
   external_owner_id: string | null;
   rental_start_datetime: string;
@@ -183,6 +191,7 @@ export const insertCustomerSchema = z.object({
   phone: z.string().nullable().default(null),
   address: z.string().nullable().default(null),
   notes: z.string().nullable().default(null),
+  segment: z.enum(["GROCERY", "FLEET"]).default("GROCERY"),
 });
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
 
@@ -194,6 +203,9 @@ export const insertPurchaseSchema = z.object({
   unit: z.string().min(1, "Unit is required"),
   unit_price: z.number().positive("Unit price must be positive"),
   amount_paid: z.number().min(0, "Amount paid cannot be negative").default(0),
+  amount_due_date: z.string().nullable().optional(),
+  package_size: z.number().nullable().default(null),
+  package_count: z.number().nullable().default(null),
 });
 export type InsertPurchase = z.infer<typeof insertPurchaseSchema>;
 
@@ -205,6 +217,9 @@ export const insertSaleSchema = z.object({
   unit: z.string().min(1, "Unit is required"),
   unit_price: z.number().positive("Unit price must be positive"),
   amount_received: z.number().min(0, "Amount received cannot be negative").default(0),
+  amount_due_date: z.string().nullable().optional(),
+  package_size: z.number().nullable().default(null),
+  package_count: z.number().nullable().default(null),
 });
 export type InsertSale = z.infer<typeof insertSaleSchema>;
 
@@ -229,7 +244,7 @@ export type InsertExternalOwner = z.infer<typeof insertExternalOwnerSchema>;
 export const insertVehicleSchema = z.object({
   vehicle_name: z.string().min(1, "Vehicle name is required"),
   vehicle_type: z.enum(["TRUCK", "MACHINE"]),
-  rental_type: z.enum(["DAY", "HOUR"]),
+  rental_type: z.enum(["DAY", "HOUR", "MONTH"]),
   ownership_type: z.enum(["OWN", "EXTERNAL"]),
   base_rate: z.number().min(0, "Rate cannot be negative").default(0),
   current_status: z.enum(["AVAILABLE", "RENTED_OUT", "RENTED_IN", "MAINTENANCE", "OFFLINE"]).default("AVAILABLE"),
@@ -241,6 +256,7 @@ export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
 export const insertRentalContractSchema = z.object({
   vehicle_id: z.string().min(1, "Vehicle is required"),
   rental_direction: z.enum(["OUTGOING", "INCOMING"]),
+  rental_type: z.enum(["DAY", "HOUR", "MONTH"]).optional(),
   customer_id: z.string().nullable().default(null),
   external_owner_id: z.string().nullable().default(null),
   rental_start_datetime: z.string().min(1, "Start date is required"),
