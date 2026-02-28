@@ -79,7 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [setUserFromSession]);
 
   const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
-    const LOGIN_TIMEOUT_MS = 20000;
+    const isMobile =
+      typeof navigator !== "undefined" &&
+      (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints > 0);
+    const LOGIN_TIMEOUT_MS = isMobile ? 40000 : 20000;
     const MAX_ATTEMPTS = 3;
     const RETRY_DELAY_MS = 1500;
 

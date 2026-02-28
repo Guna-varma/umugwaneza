@@ -3,8 +3,9 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { Logo } from "@/components/logo";
 import { AuthProvider } from "@/lib/auth";
 import { useAuth } from "@/lib/useAuth";
 import { useEffect } from "react";
@@ -36,7 +37,6 @@ import AdminOwnersPage from "@/pages/admin-owners";
 import FleetCustomersPage from "@/pages/fleet-customers";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { NotificationBell } from "@/components/notification-bell";
-import { Logo } from "@/components/logo";
 import { Analytics } from "@vercel/analytics/react";
 
 function OwnerRouter() {
@@ -77,9 +77,32 @@ function AdminRouter() {
   );
 }
 
+function AuthenticatedHeader() {
+  const { state, isMobile, openMobile } = useSidebar();
+  const { t } = useTranslation();
+  const showBranding = state === "collapsed" || (isMobile && !openMobile);
+
+  return (
+    <header className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3 border-b border-[#e2e8f0] bg-white flex-shrink-0">
+      <div className="flex items-center gap-2 min-w-0">
+        <SidebarTrigger data-testid="button-sidebar-toggle" className="touch-manipulation" />
+        {showBranding && (
+          <>
+            <Logo className="size-8 shrink-0" />
+            <span className="font-semibold text-[#0f172a] truncate">{t("app.name")}</span>
+          </>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+        <NotificationBell />
+        <LanguageSwitcher />
+      </div>
+    </header>
+  );
+}
+
 function AuthenticatedLayout() {
   const { user } = useAuth();
-  const { t } = useTranslation();
   const isAdmin = user?.role === "SYSTEM_ADMIN";
 
   const style = {
@@ -92,17 +115,7 @@ function AuthenticatedLayout() {
       <div className="flex h-screen min-h-[100dvh] w-full bg-[#f8fafc]">
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
-          <header className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3 border-b border-[#e2e8f0] bg-white flex-shrink-0">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <SidebarTrigger data-testid="button-sidebar-toggle" className="touch-manipulation" />
-              <Logo size="sm" inline decorative />
-              <span className="text-sm font-medium text-[#1e293b] truncate">{t("app.name")}</span>
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-              <NotificationBell />
-              <LanguageSwitcher />
-            </div>
-          </header>
+          <AuthenticatedHeader />
           <main className="flex-1 overflow-auto min-h-0">
             <div className="animate-page-fade">
               {isAdmin ? <AdminRouter /> : <OwnerRouter />}

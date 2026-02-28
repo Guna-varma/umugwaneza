@@ -348,3 +348,64 @@
     inset: -1px;
   }
 }
+
+/* ========== Executive Dashboard Theme – Light, high-contrast for readability ========== */
+.dashboard-executive {
+  --dash-bg: 210 20% 97%;
+  --dash-card: 0 0% 100%;
+  --dash-card-border: 214 20% 88%;
+  --dash-muted: 215 16% 47%;
+  --dash-foreground: 215 25% 17%;
+  --dash-emerald: 160 84% 39%;
+  --dash-rose: 0 72% 51%;
+  --dash-gold: 43 96% 56%;
+  --dash-cyan: 189 94% 43%;
+  --dash-violet: 263 70% 58%;
+  font-family: var(--font-sans), "Inter", system-ui, sans-serif;
+}
+
+.dashboard-executive .dashboard-bg {
+  background: linear-gradient(180deg, hsl(210 20% 97%) 0%, hsl(210 18% 94%) 100%);
+  min-height: 100%;
+}
+
+.dashboard-executive .dashboard-card {
+  background: hsl(var(--dash-card));
+  border: 1px solid hsl(var(--dash-card-border));
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px -4px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.dashboard-executive .dashboard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 8px 24px -8px rgba(0, 0, 0, 0.12);
+  border-color: hsl(214 20% 82%);
+}
+
+.dashboard-executive .dashboard-kpi-value {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  color: hsl(var(--dash-foreground));
+}
+
+.dashboard-executive .dashboard-section-title {
+  color: hsl(var(--dash-foreground));
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.dashboard-executive .dashboard-muted {
+  color: hsl(var(--dash-muted));
+}
+
+@keyframes dashboard-count-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dashboard-glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px -5px rgba(16, 185, 129, 0.2); }
+  50% { box-shadow: 0 0 32px -4px rgba(16, 185, 129, 0.35); }
+}

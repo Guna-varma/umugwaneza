@@ -78,6 +78,7 @@
     "today_sales": "Today Sales",
     "monthly_sales": "Monthly Sales",
     "monthly_profit": "Monthly Profit",
+    "monthly_profit_hint": "This month purchase from manufacturer is more",
     "outstanding_payables": "Outstanding Payables",
     "outstanding_receivables": "Outstanding Receivables",
     "total_vehicles": "Total Vehicles",

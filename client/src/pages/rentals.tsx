@@ -161,6 +161,9 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
         notes: values.notes || null,
       });
       if (error) throw new Error(error.message);
+      const vehicleStatus = direction === "OUTGOING" ? "RENTED_OUT" : "RENTED_IN";
+      const { error: errVehicle } = await db().from("vehicles").update({ current_status: vehicleStatus }).eq("id", values.vehicle_id);
+      if (errVehicle) throw new Error(errVehicle.message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["umugwaneza", "rental_contracts", businessId, direction] });
