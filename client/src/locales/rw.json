@@ -36,7 +36,12 @@
     "quick_access": "Kwinjira vuba",
     "system_admin": "Umuyobozi wa Sisitemu",
     "business_owner": "Nyir'ubucuruzi",
-    "enter_credentials": "Andika amakuru yawe yo kwinjira kuri sisitemu"
+    "enter_credentials": "Andika amakuru yawe yo kwinjira kuri sisitemu",
+    "try_again": "Gerageza",
+    "error_try_again_hint": "Niba biri gutera, reba umuyoboro cyangwa gerageza noneho.",
+    "please_wait": "Nyamuneka tegereza mbere yo kugerageza.",
+    "too_many_attempts": "Ugereranije ry'inshuro yo kwinjira.",
+    "try_again_in": "Gerageza mu"
   },
   "nav": {
     "overview": "Incamake",

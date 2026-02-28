@@ -36,7 +36,12 @@
     "quick_access": "Quick Access",
     "system_admin": "System Admin",
     "business_owner": "Business Owner",
-    "enter_credentials": "Enter your credentials to access the platform"
+    "enter_credentials": "Enter your credentials to access the platform",
+    "try_again": "Try again",
+    "error_try_again_hint": "If this keeps happening, check your connection or try again in a moment.",
+    "please_wait": "Please wait a moment before trying again.",
+    "too_many_attempts": "Too many sign-in attempts.",
+    "try_again_in": "Try again in"
   },
   "nav": {
     "overview": "Overview",

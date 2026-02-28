@@ -79,39 +79,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [setUserFromSession]);
 
   const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
-    const LOGIN_TIMEOUT_MS = 15000;
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Connection timed out. Check your network and try again.")), LOGIN_TIMEOUT_MS)
-    );
-    try {
-      const { data, error } = await Promise.race([
-        supabase.auth.signInWithPassword({ email, password }),
-        timeoutPromise,
-      ]);
-      if (error) {
-        if (import.meta.env.DEV) console.error("[Supabase Auth]", error.message, error);
-        const raw = (error.message || "").toLowerCase();
-        const msg =
-          raw.includes("invalid") && (raw.includes("credential") || raw.includes("password") || raw.includes("login"))
-            ? "Invalid email or password."
-            : error.message || "Invalid login credentials.";
-        return { success: false, message: msg };
-      }
-      if (!data.session?.user?.id) {
-        return { success: false, message: "Invalid login credentials." };
-      }
-      const appUser = await fetchAppUser(data.session.user.id);
-      if (!appUser) {
-        await supabase.auth.signOut();
-        return { success: false, message: "This account is not authorized to access the platform. Please contact your administrator." };
-      }
-      await setUserFromSession(data.session);
-      return { success: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Network or server error. Please try again.";
-      if (import.meta.env.DEV) console.error("[Supabase Auth]", message, err);
-      return { success: false, message };
+    const LOGIN_TIMEOUT_MS = 20000;
+    const MAX_ATTEMPTS = 3;
+    const RETRY_DELAY_MS = 1500;
+
+    function isRetryableError(err: unknown): boolean {
+      const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+      return (
+        msg.includes("lock") ||
+        msg.includes("lockmanager") ||
+        msg.includes("timed out") ||
+        msg.includes("timeout") ||
+        msg.includes("load failed") ||
+        msg.includes("network") ||
+        msg.includes("failed to fetch") ||
+        msg.includes("connection")
+      );
     }
+
+    function toUserMessage(err: unknown): string {
+      const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+      if (msg.includes("invalid") && (msg.includes("credential") || msg.includes("password") || msg.includes("login")))
+        return "Invalid email or password.";
+      if (msg.includes("lock") || msg.includes("lockmanager") || msg.includes("timed out"))
+        return "Sign-in took too long (often on mobile). Please try again.";
+      if (msg.includes("load failed") || msg.includes("failed to fetch") || msg.includes("network"))
+        return "Connection problem. Check your network and try again.";
+      if (msg.includes("timeout") || msg.includes("connection"))
+        return "Connection timed out. Please try again.";
+      return err instanceof Error ? err.message : "Sign-in failed. Please try again.";
+    }
+
+    const timeoutPromise = () =>
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Connection timed out. Please try again.")), LOGIN_TIMEOUT_MS)
+      );
+
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const { data, error } = await Promise.race([
+          supabase.auth.signInWithPassword({ email, password }),
+          timeoutPromise(),
+        ]);
+        if (error) {
+          lastError = error;
+          if (import.meta.env.DEV) console.error("[Supabase Auth]", error.message, error);
+          const raw = (error.message || "").toLowerCase();
+          const isInvalidCreds =
+            raw.includes("invalid") && (raw.includes("credential") || raw.includes("password") || raw.includes("login"));
+          if (isInvalidCreds) return { success: false, message: "Invalid email or password." };
+          if (!isRetryableError(error) || attempt === MAX_ATTEMPTS)
+            return { success: false, message: error.message || "Invalid login credentials." };
+          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+          continue;
+        }
+        if (!data.session?.user?.id) return { success: false, message: "Invalid login credentials." };
+        const appUser = await fetchAppUser(data.session.user.id);
+        if (!appUser) {
+          await supabase.auth.signOut();
+          return { success: false, message: "This account is not authorized to access the platform. Please contact your administrator." };
+        }
+        await setUserFromSession(data.session);
+        return { success: true };
+      } catch (err) {
+        lastError = err;
+        if (import.meta.env.DEV) console.error("[Supabase Auth]", err);
+        if (attempt === MAX_ATTEMPTS) return { success: false, message: toUserMessage(err) };
+        if (!isRetryableError(err)) return { success: false, message: toUserMessage(err) };
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      }
+    }
+    return { success: false, message: toUserMessage(lastError) };
   }, [setUserFromSession]);
 
   const logout = useCallback(async () => {
