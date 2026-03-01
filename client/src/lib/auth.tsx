@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })();
 
-    const timeout = window.setTimeout(stopLoading, 2000);
+    const timeout = window.setTimeout(stopLoading, 1000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
@@ -82,9 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isMobile =
       typeof navigator !== "undefined" &&
       (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints > 0);
-    const LOGIN_TIMEOUT_MS = isMobile ? 40000 : 20000;
-    const MAX_ATTEMPTS = 3;
-    const RETRY_DELAY_MS = 1500;
+    const LOGIN_TIMEOUT_MS = isMobile ? 25000 : 12000;
+    const MAX_ATTEMPTS = 2;
+    const RETRY_DELAY_MS = 600;
 
     function isRetryableError(err: unknown): boolean {
       const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
@@ -143,7 +143,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await supabase.auth.signOut();
           return { success: false, message: "This account is not authorized to access the platform. Please contact your administrator." };
         }
-        await setUserFromSession(data.session);
+        // Set user from already-fetched appUser (avoid second fetch in setUserFromSession)
+        const authUser: AuthUser = {
+          role: appUser.role as "SYSTEM_ADMIN" | "OWNER",
+          business_id: appUser.business_id ?? undefined,
+          admin_name: appUser.role === "SYSTEM_ADMIN" ? (appUser.full_name || "System Admin") : undefined,
+          owner_name: appUser.role === "OWNER" ? (appUser.full_name || "Owner") : undefined,
+        };
+        setUser(authUser);
         return { success: true };
       } catch (err) {
         lastError = err;
@@ -154,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     return { success: false, message: toUserMessage(lastError) };
-  }, [setUserFromSession]);
+  }, []);
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();

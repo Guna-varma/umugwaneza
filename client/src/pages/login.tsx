@@ -12,9 +12,9 @@ import { cn } from "@/lib/utils";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const MIN_SUBMIT_INTERVAL_MS = 2000;
+const MIN_SUBMIT_INTERVAL_MS = 800;
 const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 3 * 60 * 1000;
+const LOCKOUT_DURATION_MS = 90 * 1000;
 
 function formatLockoutRemaining(ms: number): string {
   const sec = Math.ceil(ms / 1000);

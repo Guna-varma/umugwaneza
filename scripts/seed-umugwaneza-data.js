@@ -93,6 +93,7 @@ async function seedCustomers() {
 async function seedVehicles() {
   const { data: existing } = await db().from("vehicles").select("id").eq("business_id", BID).limit(1);
   if (existing?.length) return;
+  // New vehicles created on the website must not set hapyjo_vehicle_id (Hapyjo sync contract).
   const { data: rows, error } = await db().from("vehicles").insert([
     { business_id: BID, vehicle_name: "RAA 100A", vehicle_type: "TRUCK", rental_type: "DAY", ownership_type: "OWN", base_rate: 150000, current_status: "AVAILABLE", current_location: "Kigali Depot" },
     { business_id: BID, vehicle_name: "RAB 200B", vehicle_type: "TRUCK", rental_type: "DAY", ownership_type: "OWN", base_rate: 150000, current_status: "AVAILABLE", current_location: "Kigali Depot" },

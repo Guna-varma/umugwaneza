@@ -66,7 +66,19 @@ export default function VehiclesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: InsertVehicle) => {
-      const { error } = await db().from("vehicles").insert({ ...values, business_id: businessId });
+      const { vehicle_name, vehicle_type, rental_type, ownership_type, base_rate, current_status, current_location, notes } = values;
+      const payload = {
+        business_id: businessId,
+        vehicle_name,
+        vehicle_type,
+        rental_type,
+        ownership_type,
+        base_rate,
+        current_status,
+        current_location: current_location ?? null,
+        notes: notes ?? null,
+      };
+      const { error } = await db().from("vehicles").insert(payload);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
@@ -79,21 +91,23 @@ export default function VehiclesPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (values: InsertVehicle) => {
-      if (!editingVehicle) throw new Error("No vehicle selected");
+    mutationFn: async ({ values, current }: { values: InsertVehicle; current: Vehicle }) => {
+      const payload: Record<string, unknown> = {};
+      if (values.vehicle_name !== current.vehicle_name) payload.vehicle_name = values.vehicle_name;
+      if (values.vehicle_type !== current.vehicle_type) payload.vehicle_type = values.vehicle_type;
+      if (values.rental_type !== current.rental_type) payload.rental_type = values.rental_type;
+      if (values.ownership_type !== current.ownership_type) payload.ownership_type = values.ownership_type;
+      if (values.base_rate !== current.base_rate) payload.base_rate = values.base_rate;
+      if (values.current_status !== current.current_status) payload.current_status = values.current_status;
+      const nextLoc = values.current_location ?? null;
+      if (nextLoc !== (current.current_location ?? null)) payload.current_location = nextLoc;
+      const nextNotes = values.notes ?? null;
+      if (nextNotes !== (current.notes ?? null)) payload.notes = nextNotes;
+      if (Object.keys(payload).length === 0) return;
       const { error } = await db()
         .from("vehicles")
-        .update({
-          vehicle_name: values.vehicle_name,
-          vehicle_type: values.vehicle_type,
-          rental_type: values.rental_type,
-          ownership_type: values.ownership_type,
-          base_rate: values.base_rate,
-          current_status: values.current_status,
-          current_location: values.current_location ?? null,
-          notes: values.notes ?? null,
-        })
-        .eq("id", editingVehicle.id)
+        .update(payload)
+        .eq("id", current.id)
         .eq("business_id", businessId);
       if (error) throw new Error(error.message);
     },
@@ -104,7 +118,7 @@ export default function VehiclesPage() {
       setEditOpen(false);
       setEditingVehicle(null);
     },
-    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   const startEdit = (v: Vehicle) => {
@@ -181,19 +195,24 @@ export default function VehiclesPage() {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>{editingVehicle ? t("vehicles.update_vehicle") : t("vehicles.add_new_vehicle")}</DialogTitle>
+                {editingVehicle?.hapyjo_vehicle_id != null && (
+                  <p className="text-sm text-[#64748b] mt-1" data-testid="text-synced-note">{t("vehicles.name_syncs_to_fleet_app")}</p>
+                )}
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit((v) => (editingVehicle ? updateMutation.mutate(v) : createMutation.mutate(v)))} className="space-y-4">
+                <form onSubmit={form.handleSubmit((v) => (editingVehicle ? updateMutation.mutate({ values: v, current: editingVehicle }) : createMutation.mutate(v)))} className="space-y-4">
                   <FormField control={form.control} name="vehicle_name" render={({ field }) => (
                     <FormItem><FormLabel>{t("vehicles.vehicle_name")}</FormLabel><FormControl><Input {...field} data-testid="input-vehicle-name" /></FormControl><FormMessage /></FormItem>
                   )} />
                   <div className="grid grid-cols-2 gap-4">
                     <FormField control={form.control} name="vehicle_type" render={({ field }) => (
                       <FormItem><FormLabel>{t("vehicles.type")}</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={editingVehicle?.hapyjo_vehicle_id != null}>
                           <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent><SelectItem value="TRUCK">{t("vehicles.truck")}</SelectItem><SelectItem value="MACHINE">{t("vehicles.machine")}</SelectItem></SelectContent>
-                        </Select><FormMessage />
+                        </Select>
+                        {editingVehicle?.hapyjo_vehicle_id != null && <p className="text-xs text-[#64748b]">{t("vehicles.type_managed_by_fleet_app")}</p>}
+                        <FormMessage />
                       </FormItem>
                     )} />
                     <FormField control={form.control} name="rental_type" render={({ field }) => (
@@ -264,7 +283,14 @@ export default function VehiclesPage() {
                 <TableBody>
                   {vehicles.map((v, i) => (
                     <TableRow key={v.id} className="border-b border-[#e2e8f0] animate-row-slide hover:bg-[#f8fafc]" style={{ animationDelay: `${i * 30}ms` }} data-testid={`row-vehicle-${v.id}`}>
-                      <TableCell className="font-medium text-[#1e293b]">{v.vehicle_name}</TableCell>
+                      <TableCell className="font-medium text-[#1e293b]">
+                        <span className="inline-flex items-center gap-2 flex-wrap">
+                          {v.vehicle_name}
+                          {v.hapyjo_vehicle_id != null && (
+                            <Badge variant="secondary" className="text-xs font-normal" data-testid="badge-synced-fleet">{t("vehicles.synced_from_fleet_app")}</Badge>
+                          )}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-[#64748b]">{v.vehicle_type}</TableCell>
                       <TableCell className="text-[#64748b]">{rentalTypeLabel(v.rental_type)}</TableCell>
                       <TableCell className="text-[#64748b]">{v.ownership_type}</TableCell>

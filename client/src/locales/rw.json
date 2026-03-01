@@ -288,7 +288,10 @@
     "no_vehicles": "Nta modoka",
     "add_first": "Ongeraho cyangwa uhuze imodoka kugirango utangire",
     "sync_complete": "Guhuza byarangiye",
-    "sync_failed": "Guhuza ntibyakunze"
+    "sync_failed": "Guhuza ntibyakunze",
+    "synced_from_fleet_app": "Yahuzwe n'aplikasi ya fleet",
+    "name_syncs_to_fleet_app": "Iyi modoka ihuza n'aplikasi ya fleet. Guhindura izina hano bigihindura aho.",
+    "type_managed_by_fleet_app": "Ubwoko bucungwa n'aplikasi ya fleet."
   },
   "external_owners": {
     "title": "Banyir'ibikoresho bo hanze",
