@@ -60,7 +60,12 @@ export default function PurchasesPage() {
   const { data: suppliers } = useQuery<Supplier[]>({
     queryKey: ["umugwaneza", "suppliers", businessId],
     queryFn: async () => {
-      const { data, error } = await db().from("suppliers").select("*").eq("business_id", businessId).order("created_at", { ascending: false });
+      const { data, error } = await db()
+        .from("suppliers")
+        .select("*")
+        .eq("business_id", businessId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
       return data ?? [];
     },

@@ -61,17 +61,25 @@ export default function ReportsPage() {
   const [activeGroup, setActiveGroup] = useState<ReportGroup>("grocery");
 
   const { data: suppliers } = useQuery({
-    queryKey: ["umugwaneza", "suppliers"],
+    queryKey: ["umugwaneza", "suppliers", "active"],
     queryFn: async () => {
-      const { data, error } = await db().from("suppliers").select("id, supplier_name").order("supplier_name");
+      const { data, error } = await db()
+        .from("suppliers")
+        .select("id, supplier_name")
+        .eq("is_active", true)
+        .order("supplier_name");
       if (error) throw new Error(error.message);
       return data ?? [];
     },
   });
   const { data: customers } = useQuery({
-    queryKey: ["umugwaneza", "customers"],
+    queryKey: ["umugwaneza", "customers", "active"],
     queryFn: async () => {
-      const { data, error } = await db().from("customers").select("id, customer_name").order("customer_name");
+      const { data, error } = await db()
+        .from("customers")
+        .select("id, customer_name")
+        .eq("is_active", true)
+        .order("customer_name");
       if (error) throw new Error(error.message);
       return data ?? [];
     },

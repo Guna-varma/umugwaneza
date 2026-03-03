@@ -35,8 +35,18 @@ function statusVariant(status: string) {
     case "RENTED_OUT": return "secondary";
     case "RENTED_IN": return "secondary";
     case "MAINTENANCE": return "destructive";
-    case "OFFLINE": return "destructive";
+    case "OFFLINE": return "outline";
     default: return "secondary";
+  }
+}
+
+function statusBadgeClass(status: string) {
+  switch (status) {
+    case "AVAILABLE": return "bg-[#10b981]/15 text-[#059669] border-[#10b981]/30";
+    case "RENTED_OUT": return "bg-[#3b82f6]/15 text-[#2563eb] border-[#3b82f6]/30";
+    case "RENTED_IN": return "bg-[#8b5cf6]/15 text-[#7c3aed] border-[#8b5cf6]/30";
+    case "MAINTENANCE": return "bg-[#ef4444]/15 text-[#dc2626] border-[#ef4444]/30";
+    default: return "";
   }
 }
 
@@ -295,7 +305,7 @@ export default function VehiclesPage() {
                       <TableCell className="text-[#64748b]">{rentalTypeLabel(v.rental_type)}</TableCell>
                       <TableCell className="text-[#64748b]">{v.ownership_type}</TableCell>
                       <TableCell className="text-right text-[#1e293b]">{new Intl.NumberFormat("en-RW").format(v.base_rate)}</TableCell>
-                      <TableCell><Badge variant={statusVariant(v.current_status)}>{v.current_status.replace("_", " ")}</Badge></TableCell>
+                      <TableCell><Badge variant={statusVariant(v.current_status) as "default" | "secondary" | "destructive" | "outline"} className={statusBadgeClass(v.current_status)}>{v.current_status.replace("_", " ")}</Badge></TableCell>
                       <TableCell className="text-[#64748b]">{v.current_location || "—"}</TableCell>
                       <TableCell className="text-right">
                         <TooltipProvider>

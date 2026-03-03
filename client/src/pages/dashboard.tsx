@@ -11,7 +11,9 @@ import {
   RentalKpiRow,
   GroceryChartsSection,
   RentalChartsSection,
+  MaintenanceDashboardSection,
   useDashboardTrends,
+  useDashboardRentalMonthly,
   type GroceryStats,
   type RentalStats,
 } from "@/components/dashboard";
@@ -52,6 +54,7 @@ export default function DashboardPage() {
   });
 
   const { trends } = useDashboardTrends();
+  const { monthly: rentalMonthly } = useDashboardRentalMonthly(12);
 
   const grocery = (groceryStats as GroceryStats) || {};
   const rental = (rentalStats as RentalStats) || {};
@@ -119,8 +122,17 @@ export default function DashboardPage() {
             rental={rental}
             rentalDaily={trends.rentalDaily}
             topVehicles={trends.topVehicles}
+            rentalMonthly={rentalMonthly}
           />
         </div>
+      </section>
+
+      <section className="mb-12">
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold text-[#1e293b]">{t("dashboard.maintenance_section_title")}</h2>
+          <p className="text-sm text-[#64748b] mt-0.5">{t("dashboard.maintenance_section_subtitle")}</p>
+        </div>
+        <MaintenanceDashboardSection rental={rental} />
       </section>
     </div>
   );

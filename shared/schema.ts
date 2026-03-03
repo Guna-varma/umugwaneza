@@ -26,6 +26,7 @@ export type Supplier = {
   phone: string | null;
   address: string | null;
   notes: string | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -38,6 +39,7 @@ export type Customer = {
   address: string | null;
   notes: string | null;
   segment: "GROCERY" | "FLEET";
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -107,6 +109,7 @@ export type ExternalAssetOwner = {
   phone: string | null;
   address: string | null;
   notes: string | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -116,6 +119,7 @@ export type Vehicle = {
   business_id: string;
   hapyjo_vehicle_id: string | null;
   vehicle_name: string;
+  registration_number: string | null;
   vehicle_type: "TRUCK" | "MACHINE";
   rental_type: "DAY" | "HOUR" | "MONTH";
   ownership_type: "OWN" | "EXTERNAL";
@@ -161,6 +165,28 @@ export type RentalPayment = {
   mode: string;
   notes: string | null;
   created_at: string;
+};
+
+export type MaintenanceRecord = {
+  id: string;
+  business_id: string;
+  vehicle_id: string;
+  maintenance_type: "Preventive" | "Repair" | "Breakdown" | "Service" | null;
+  start_date: string;
+  expected_completion_date: string | null;
+  completion_date: string | null;
+  end_date: string | null;
+  downtime_days: number | null;
+  cost: number;
+  vendor_name: string | null;
+  invoice_number: string | null;
+  status: "Scheduled" | "In_Progress" | "Completed";
+  next_service_date: string | null;
+  description: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type HapyjoVehicle = {

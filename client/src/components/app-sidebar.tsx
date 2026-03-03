@@ -18,6 +18,7 @@ import {
   Bell,
   Building2,
   LogOut,
+  Wrench,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import {
@@ -66,8 +67,9 @@ export function AppSidebar() {
     {
       label: t("nav.fleet_rental"),
       items: [
-        { title: t("nav.vehicles"), url: "/vehicles", icon: Truck },
-        { title: t("nav.fleet_customers"), url: "/fleet/customers", icon: UserCheck },
+        { title: t("nav.vehicles", "Vehicles"), url: "/vehicles", icon: Truck },
+        { title: t("nav.vehicle_maintenance", "Vehicle Maintenance"), url: "/maintenance", icon: Wrench },
+        { title: t("nav.fleet_customers", "Customers"), url: "/fleet/customers", icon: UserCheck },
         { title: t("nav.external_owners"), url: "/external-owners", icon: UserPlus },
         { title: t("nav.outgoing_rental"), url: "/rentals/outgoing", icon: ArrowUpRight },
         { title: t("nav.incoming_rental"), url: "/rentals/incoming", icon: ArrowDownLeft },

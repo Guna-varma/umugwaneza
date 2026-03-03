@@ -16,7 +16,24 @@ export type RentalStats = {
   rentedIn?: number;
   maintenance?: number;
   todayRevenue?: number;
+  todayExpense?: number;
   monthRevenue?: number;
+  monthExpense?: number;
+  monthRentExpense?: number;
+  monthMaintenanceExpense?: number;
+  monthProfit?: number;
+  maintenanceExpenseYTD?: number;
+  maintenanceDowntimeDaysMonth?: number;
+  maintenanceRecordCountMonth?: number;
+};
+
+export type MonthlyRentalPoint = {
+  month: string;
+  totalIncome: number;
+  totalRentExpense?: number;
+  totalMaintenanceExpense?: number;
+  totalExpense: number;
+  profit: number;
 };
 
 /** Trend data for charts (backend can provide these arrays) */

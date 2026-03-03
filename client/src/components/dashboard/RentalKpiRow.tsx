@@ -17,6 +17,8 @@ function formatRWF(amount: number) {
 export function RentalKpiRow({ rental }: { rental: RentalStats }) {
   const { t } = useTranslation();
 
+  const monthProfit = Number(rental.monthProfit) ?? 0;
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       <DashboardKpiCard
@@ -48,7 +50,7 @@ export function RentalKpiRow({ rental }: { rental: RentalStats }) {
         data-testid="text-stat-rented-in"
       />
       <DashboardKpiCard
-        title={t("dashboard.maintenance")}
+        title={t("dashboard.vehicles_under_maintenance")}
         value={rental.maintenance ?? 0}
         icon={Wrench}
         color="#eab308"
@@ -62,11 +64,39 @@ export function RentalKpiRow({ rental }: { rental: RentalStats }) {
         data-testid="text-stat-today-rental-revenue"
       />
       <DashboardKpiCard
-        title={t("dashboard.monthly_rental_revenue")}
+        title={t("dashboard.monthly_rental_income")}
         value={formatRWF(Number(rental.monthRevenue) ?? 0)}
         icon={Banknote}
-        color="#06b6d4"
-        data-testid="text-stat-monthly-rental-revenue"
+        color="#10b981"
+        data-testid="text-stat-monthly-rental-income"
+      />
+      <DashboardKpiCard
+        title={t("dashboard.monthly_rental_expense")}
+        value={formatRWF(Number(rental.monthExpense) ?? 0)}
+        icon={Banknote}
+        color="#f43f5e"
+        data-testid="text-stat-monthly-rental-expense"
+      />
+      <DashboardKpiCard
+        title={t("dashboard.monthly_maintenance_expense")}
+        value={formatRWF(Number(rental.monthMaintenanceExpense) ?? 0)}
+        icon={Wrench}
+        color="#eab308"
+        data-testid="text-stat-monthly-maintenance-expense"
+      />
+      <DashboardKpiCard
+        title={t("dashboard.maintenance_expense_ytd")}
+        value={formatRWF(Number(rental.maintenanceExpenseYTD) ?? 0)}
+        icon={Wrench}
+        color="#ca8a04"
+        data-testid="text-stat-maintenance-expense-ytd"
+      />
+      <DashboardKpiCard
+        title={t("dashboard.monthly_rental_profit")}
+        value={formatRWF(monthProfit)}
+        icon={Banknote}
+        color={monthProfit >= 0 ? "#10b981" : "#f43f5e"}
+        data-testid="text-stat-monthly-rental-profit"
       />
     </div>
   );

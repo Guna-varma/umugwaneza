@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -17,7 +17,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, UserCheck, Pencil } from "lucide-react";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
+import { ListTableToolbar } from "@/components/ListTableToolbar";
+import { useListTable } from "@/hooks/useListTable";
+import { Plus, UserCheck, Pencil, Trash2 } from "lucide-react";
 
 export default function CustomersPage() {
   const { t } = useTranslation();
@@ -27,6 +30,8 @@ export default function CustomersPage() {
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
 
   const { data: customers, isLoading } = useQuery<Customer[]>({
     queryKey: ["umugwaneza", "customers", businessId, "GROCERY"],
@@ -36,11 +41,21 @@ export default function CustomersPage() {
         .select("*")
         .eq("business_id", businessId)
         .eq("segment", "GROCERY")
+        .eq("is_active", true)
         .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
       return data ?? [];
     },
   });
+
+  const getSearchable = useCallback((c: Customer) =>
+    [c.customer_name, c.phone, c.address, c.notes].filter(Boolean).join(" "), []);
+  const list = useListTable(
+    customers ?? [],
+    ["customer_name", "phone", "address", "notes"],
+    getSearchable,
+    10
+  );
 
   const form = useForm<InsertCustomer>({
     resolver: zodResolver(insertCustomerSchema),
@@ -100,6 +115,25 @@ export default function CustomersPage() {
       toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await db()
+        .from("customers")
+        .update({ is_active: false })
+        .eq("id", id)
+        .eq("business_id", businessId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "customers", businessId, "GROCERY"] });
+      toast({ title: t("common.customer_updated"), description: "Customer deleted." });
+      setDeleteDialogOpen(false);
+      setCustomerToDelete(null);
+    },
+    onError: (e: unknown) =>
+      toast({ title: t("common.error"), description: (e as Error).message, variant: "destructive" }),
+  });
+
   const startEdit = (c: Customer) => {
     setEditingCustomer(c);
     editForm.reset({
@@ -109,6 +143,15 @@ export default function CustomersPage() {
       notes: c.notes || "",
     });
     setEditOpen(true);
+  };
+
+  const openDeleteDialog = (c: Customer) => {
+    setCustomerToDelete(c);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (customerToDelete) deleteMutation.mutate(customerToDelete.id);
   };
 
   return (
@@ -147,7 +190,7 @@ export default function CustomersPage() {
         </Dialog>
       </div>
 
-      <Card className="border border-[#e2e8f0] bg-white">
+      <Card className="border border-[#e2e8f0] bg-white overflow-hidden">
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-6 space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
@@ -158,47 +201,89 @@ export default function CustomersPage() {
               <p className="text-sm text-[#64748b]">{t("customers.add_first")}</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-b border-[#e2e8f0]">
-                  <TableHead className="text-[#64748b]">{t("customers.customer_name")}</TableHead>
-                  <TableHead className="text-[#64748b]">{t("customers.phone")}</TableHead>
-                  <TableHead className="text-[#64748b]">{t("customers.address")}</TableHead>
-                  <TableHead className="text-[#64748b]">{t("customers.notes")}</TableHead>
-                  <TableHead className="text-right text-[#64748b]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {customers.map((c, i) => (
-                  <TableRow
-                    key={c.id}
-                    className="border-b border-[#e2e8f0] animate-row-slide"
-                    style={{ animationDelay: `${i * 30}ms` }}
-                    data-testid={`row-customer-${c.id}`}
-                  >
-                    <TableCell className="font-medium text-[#1e293b]">{c.customer_name}</TableCell>
-                    <TableCell className="text-[#64748b]">{c.phone || "—"}</TableCell>
-                    <TableCell className="text-[#64748b]">{c.address || "—"}</TableCell>
-                    <TableCell className="text-[#64748b] max-w-[200px] truncate">{c.notes || "—"}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 px-3 text-xs"
-                        onClick={() => startEdit(c)}
-                        data-testid={`button-edit-customer-${c.id}`}
+            <>
+              <ListTableToolbar
+                search={list.search}
+                onSearchChange={(v) => { list.setSearch(v); list.resetPage(); }}
+                pageSize={list.pageSize}
+                pageSizes={list.pageSizes}
+                onPageSizeChange={list.setPageSize}
+                from={list.from}
+                to={list.to}
+                total={list.totalItems}
+                page={list.page}
+                totalPages={list.totalPages}
+                onPageChange={list.setPage}
+              />
+              {list.pageItems.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <p className="text-[#64748b] font-medium">{t("common.no_results_search")}</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-[#e2e8f0]">
+                      <TableHead className="text-[#64748b]">{t("customers.customer_name")}</TableHead>
+                      <TableHead className="text-[#64748b]">{t("customers.phone")}</TableHead>
+                      <TableHead className="text-[#64748b]">{t("customers.address")}</TableHead>
+                      <TableHead className="text-[#64748b]">{t("customers.notes")}</TableHead>
+                      <TableHead className="text-right text-[#64748b]">{t("common.actions")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {list.pageItems.map((c, i) => (
+                      <TableRow
+                        key={c.id}
+                        className="border-b border-[#e2e8f0] animate-row-slide hover:bg-[#f8fafc]"
+                        style={{ animationDelay: `${i * 30}ms` }}
+                        data-testid={`row-customer-${c.id}`}
                       >
-                        <Pencil className="h-3 w-3 mr-1.5" />
-                        Edit
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                        <TableCell className="font-medium text-[#1e293b]">{c.customer_name}</TableCell>
+                        <TableCell className="text-[#64748b]">{c.phone || "—"}</TableCell>
+                        <TableCell className="text-[#64748b]">{c.address || "—"}</TableCell>
+                        <TableCell className="text-[#64748b] max-w-[200px] truncate">{c.notes || "—"}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-3 text-xs"
+                              onClick={() => startEdit(c)}
+                              data-testid={`button-edit-customer-${c.id}`}
+                            >
+                              <Pencil className="h-3 w-3 mr-1.5" />
+                              {t("common.edit")}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-3 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+                              onClick={() => openDeleteDialog(c)}
+                              data-testid={`button-delete-customer-${c.id}`}
+                            >
+                              <Trash2 className="h-3 w-3 mr-1.5" />
+                              {t("common.delete")}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        itemName={customerToDelete?.customer_name ?? ""}
+        entityKey="entity_customer"
+        departmentKey="department_grocery"
+        onConfirm={confirmDelete}
+        isDeleting={deleteMutation.isPending}
+      />
       <Dialog
         open={editOpen}
         onOpenChange={(o) => {

@@ -102,9 +102,15 @@ export default function SalesPage() {
   }, [purchasesForStock, sales]);
 
   const { data: customers } = useQuery<Customer[]>({
-    queryKey: ["umugwaneza", "customers", businessId],
+    queryKey: ["umugwaneza", "customers", businessId, "GROCERY"],
     queryFn: async () => {
-      const { data, error } = await db().from("customers").select("*").eq("business_id", businessId).order("created_at", { ascending: false });
+      const { data, error } = await db()
+        .from("customers")
+        .select("*")
+        .eq("business_id", businessId)
+        .eq("segment", "GROCERY")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
       return data ?? [];
     },

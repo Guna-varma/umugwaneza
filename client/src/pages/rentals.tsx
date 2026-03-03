@@ -96,6 +96,7 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
         .select("*")
         .eq("business_id", businessId)
         .eq("segment", "FLEET")
+        .eq("is_active", true)
         .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
       return data ?? [];
@@ -105,7 +106,12 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
   const { data: externalOwners } = useQuery<ExternalAssetOwner[]>({
     queryKey: ["umugwaneza", "external_asset_owners", businessId],
     queryFn: async () => {
-      const { data, error } = await db().from("external_asset_owners").select("*").eq("business_id", businessId).order("created_at", { ascending: false });
+      const { data, error } = await db()
+        .from("external_asset_owners")
+        .select("*")
+        .eq("business_id", businessId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
       return data ?? [];
     },
@@ -124,8 +130,8 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
   const endDt = form.watch("rental_end_datetime");
   const rate = form.watch("rate");
   const formRentalType = form.watch("rental_type");
-  // Outgoing: all vehicles; user chooses charge type (Day/Hour). Incoming: rental type from vehicle (Day/Hour/Month).
-  const vehiclesForForm = vehicles ?? [];
+  // Only AVAILABLE vehicles can be booked (exclude MAINTENANCE, RENTED_OUT, RENTED_IN).
+  const vehiclesForForm = (vehicles ?? []).filter((v) => v.current_status === "AVAILABLE");
   const selectedVehicle = vehicles?.find((v) => v.id === vehicleId);
   const rentalType = isOutgoing ? (formRentalType || "DAY") : (selectedVehicle?.rental_type || "DAY");
   const autoTotal = calculateTotal(startDt, endDt, rate, rentalType);

@@ -12,11 +12,12 @@ import {
   Pie,
   Cell,
   Legend,
+  ComposedChart,
 } from "recharts";
 import { useTranslation } from "react-i18next";
 import { ChartCard } from "./ChartCard";
 import type { RentalStats } from "./types";
-import type { DailyRentalPoint, VehicleRevenueRow } from "./types";
+import type { DailyRentalPoint, VehicleRevenueRow, MonthlyRentalPoint } from "./types";
 
 const COLORS = ["#10b981", "#06b6d4", "#8b5cf6", "#f43f5e", "#eab308"];
 
@@ -26,14 +27,20 @@ function formatRWF(n: number) {
   return String(Math.round(n));
 }
 
+function formatRWFTooltip(value: number) {
+  return new Intl.NumberFormat("en-RW").format(Math.round(value)) + " RWF";
+}
+
 export function RentalChartsSection({
   rental,
   rentalDaily,
   topVehicles,
+  rentalMonthly = [],
 }: {
   rental: RentalStats;
   rentalDaily: DailyRentalPoint[];
   topVehicles: VehicleRevenueRow[];
+  rentalMonthly?: MonthlyRentalPoint[];
 }) {
   const { t } = useTranslation();
 
@@ -49,25 +56,43 @@ export function RentalChartsSection({
   ].filter((d) => d.value > 0);
 
   const last30 = rentalDaily.slice(-30);
+  const monthlyChartData = rentalMonthly ?? [];
   const topVehiclesChart = topVehicles.slice(0, 8).map((v) => ({
     name: v.vehicleName.length > 12 ? v.vehicleName.slice(0, 10) + "…" : v.vehicleName,
     revenue: v.revenue,
   }));
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="space-y-6">
+      {/* Combined: Income (bar), Expense (bar), Profit (line) */}
+      {monthlyChartData.length > 0 && (
+        <ChartCard title={t("dashboard.monthly_rental_income") + " / " + t("dashboard.rent_expense") + " / " + t("dashboard.maintenance_expense") + " / " + t("dashboard.monthly_rental_profit")} subtitle="By month (bars: income, rent expense, maintenance expense; line: profit)">
+          <ResponsiveContainer width="100%" height={300}>
+            <ComposedChart data={monthlyChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.08)" />
+              <XAxis dataKey="month" tick={{ fill: "#475569", fontSize: 12 }} />
+              <YAxis tick={{ fill: "#475569", fontSize: 12 }} tickFormatter={formatRWF} />
+              <Tooltip
+                contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", color: "#1e293b", fontSize: "12px" }}
+                formatter={(value: number, name: string) => [formatRWFTooltip(value), name]}
+                labelFormatter={(label) => String(label)}
+              />
+              <Legend formatter={(value) => <span className="text-xs text-[#475569]">{value}</span>} />
+              <Bar dataKey="totalIncome" name={t("dashboard.monthly_rental_income")} fill="#10b981" radius={[4, 4, 0, 0]} stackId="a" />
+              <Bar dataKey="totalRentExpense" name={t("dashboard.rent_expense")} fill="#f43f5e" radius={[0, 0, 0, 0]} stackId="b" />
+              <Bar dataKey="totalMaintenanceExpense" name={t("dashboard.maintenance_expense")} fill="#eab308" radius={[4, 4, 0, 0]} stackId="b" />
+              <Line type="monotone" dataKey="profit" name={t("dashboard.monthly_rental_profit")} stroke="#8b5cf6" strokeWidth={2} dot={{ r: 4 }} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Vehicle Utilization" subtitle="% of fleet in use (rented out or in)">
           <div className="flex items-center justify-center h-[280px]">
             <div className="relative w-44 h-44">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  fill="none"
-                  stroke="#e2e8f0"
-                  strokeWidth="10"
-                />
+                <circle cx="50" cy="50" r="42" fill="none" stroke="#e2e8f0" strokeWidth="10" />
                 <circle
                   cx="50"
                   cy="50"
@@ -88,37 +113,17 @@ export function RentalChartsSection({
           </div>
         </ChartCard>
 
-        <ChartCard title={t("dashboard.monthly_rental_revenue")} subtitle="Last 30 days">
+        <ChartCard title={t("dashboard.monthly_rental_revenue")} subtitle="Last 30 days (daily)">
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={last30} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.08)" />
-              <XAxis
-                dataKey="date"
-                tick={{ fill: "#475569", fontSize: 12 }}
-                tickFormatter={(v) => v.slice(5)}
-              />
-              <YAxis
-                tick={{ fill: "#475569", fontSize: 12 }}
-                tickFormatter={formatRWF}
-              />
+              <XAxis dataKey="date" tick={{ fill: "#475569", fontSize: 12 }} tickFormatter={(v) => (v ? String(v).slice(5) : "")} />
+              <YAxis tick={{ fill: "#475569", fontSize: 12 }} tickFormatter={formatRWF} />
               <Tooltip
-                contentStyle={{
-                  background: "#fff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "8px",
-                  color: "#1e293b",
-                  fontSize: "12px",
-                }}
-                formatter={(value: number) => [formatRWF(value) + " RWF", "Revenue"]}
+                contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", color: "#1e293b", fontSize: "12px" }}
+                formatter={(value: number) => [formatRWFTooltip(value), "Revenue"]}
               />
-              <Line
-                type="monotone"
-                dataKey="revenue"
-                stroke="#06b6d4"
-                strokeWidth={2}
-                dot={false}
-                name="Revenue"
-              />
+              <Line type="monotone" dataKey="revenue" stroke="#06b6d4" strokeWidth={2} dot={false} name="Revenue" />
             </LineChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -188,5 +193,6 @@ export function RentalChartsSection({
           </ResponsiveContainer>
         </ChartCard>
       </div>
+    </div>
   );
 }
