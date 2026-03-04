@@ -328,7 +328,7 @@
     "add_first": "Add or sync vehicles to get started",
     "sync_complete": "Sync complete",
     "sync_failed": "Sync failed",
-    "synced_from_fleet_app": "Synced from fleet app",
+    "synced_from_fleet_app": "Synced from HapyJo App",
     "name_syncs_to_fleet_app": "This vehicle is linked to the fleet app. Changing the name here will update it there.",
     "type_managed_by_fleet_app": "Type is managed by the fleet app."
   },
