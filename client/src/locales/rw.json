@@ -306,7 +306,14 @@
     "sync_failed": "Guhuza ntibyakunze",
     "synced_from_fleet_app": "Yahuzwe n'aplikasi ya Hapyjo",
     "name_syncs_to_fleet_app": "Iyi modoka ihuza n'aplikasi ya fleet. Guhindura izina hano bigihindura aho.",
-    "type_managed_by_fleet_app": "Ubwoko bucungwa n'aplikasi ya fleet."
+    "type_managed_by_fleet_app": "Ubwoko bucungwa n'aplikasi ya fleet.",
+    "availability_enabled": "Ihari",
+    "availability_disabled": "Ntihari",
+    "cannot_deactivate_title": "Ntushobora guhagarika imodoka",
+    "cannot_deactivate_rental": "Ntushobora guhagarika imodoka, ubu iri munsi ya \"{{customer}}\". Itariki y'iherezo ry'ubukode ni: {{date}}.",
+    "unknown_customer": "Umukiriya",
+    "toggle_availability_aria": "Hindura ko imodoka ihari cyangwa ntihari kugirango ikodeshwe",
+    "cannot_deactivate_ok": "Nibyo"
   },
   "maintenance": {
     "title": "Gukora imodoka",

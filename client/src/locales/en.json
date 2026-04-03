@@ -330,7 +330,14 @@
     "sync_failed": "Sync failed",
     "synced_from_fleet_app": "Synced from HapyJo App",
     "name_syncs_to_fleet_app": "This vehicle is linked to the fleet app. Changing the name here will update it there.",
-    "type_managed_by_fleet_app": "Type is managed by the fleet app."
+    "type_managed_by_fleet_app": "Type is managed by the fleet app.",
+    "availability_enabled": "Available",
+    "availability_disabled": "Unavailable",
+    "cannot_deactivate_title": "Cannot deactivate vehicle",
+    "cannot_deactivate_rental": "Unable to deactivate vehicle, currently this vehicle is under \"{{customer}}\". Last date of rental out is: {{date}}.",
+    "unknown_customer": "Customer",
+    "toggle_availability_aria": "Toggle vehicle availability for rental",
+    "cannot_deactivate_ok": "OK"
   },
   "maintenance": {
     "title": "Vehicle Maintenance",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -28,6 +28,52 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Plus, Truck, RefreshCw, Pencil } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+/** DD-MM-YYYY for rental end (local calendar date). */
+function formatRentalEndDMY(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
+
+type ActiveOutgoingRow = {
+  vehicle_id: string;
+  rental_end_datetime: string;
+  customer: { customer_name: string } | null;
+};
+
+function parseActiveOutgoingRows(raw: unknown): ActiveOutgoingRow[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ActiveOutgoingRow[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const vehicle_id = typeof r.vehicle_id === "string" ? r.vehicle_id : null;
+    const rental_end_datetime = typeof r.rental_end_datetime === "string" ? r.rental_end_datetime : null;
+    if (!vehicle_id || !rental_end_datetime) continue;
+    const custRaw = r.customer;
+    let customer: { customer_name: string } | null = null;
+    const node = Array.isArray(custRaw) ? custRaw[0] : custRaw;
+    if (node && typeof node === "object" && "customer_name" in node) {
+      customer = { customer_name: String((node as { customer_name: unknown }).customer_name) };
+    }
+    out.push({ vehicle_id, rental_end_datetime, customer });
+  }
+  return out;
+}
 
 function statusVariant(status: string) {
   switch (status) {
@@ -59,6 +105,8 @@ export default function VehiclesPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [availabilityBlock, setAvailabilityBlock] = useState<{ customer: string; date: string } | null>(null);
+  const [togglingVehicleId, setTogglingVehicleId] = useState<string | null>(null);
 
   const { data: vehicles, isLoading } = useQuery<Vehicle[]>({
     queryKey: ["umugwaneza", "vehicles", businessId],
@@ -67,6 +115,55 @@ export default function VehiclesPage() {
       if (error) throw new Error(error.message);
       return data ?? [];
     },
+  });
+
+  /** Active customer rentals block turning a vehicle unavailable (OFFLINE). */
+  const { data: activeOutgoingRentals, isLoading: activeRentalsLoading } = useQuery<ActiveOutgoingRow[]>({
+    queryKey: ["umugwaneza", "rental_contracts", businessId, "OUTGOING", "ACTIVE"],
+    queryFn: async () => {
+      const { data, error } = await db()
+        .from("rental_contracts")
+        .select("vehicle_id, rental_end_datetime, customer:customers(customer_name)")
+        .eq("business_id", businessId)
+        .eq("rental_direction", "OUTGOING")
+        .eq("operational_status", "ACTIVE");
+      if (error) throw new Error(error.message);
+      return parseActiveOutgoingRows(data);
+    },
+  });
+
+  const activeRentalByVehicleId = useMemo(() => {
+    const best = new Map<string, { customer: string; date: string; endMs: number }>();
+    for (const row of activeOutgoingRentals ?? []) {
+      const endMs = new Date(row.rental_end_datetime).getTime();
+      if (Number.isNaN(endMs)) continue;
+      const name = row.customer?.customer_name?.trim() || "";
+      const customer = name || t("vehicles.unknown_customer");
+      const date = formatRentalEndDMY(row.rental_end_datetime);
+      const prev = best.get(row.vehicle_id);
+      if (!prev || endMs > prev.endMs) best.set(row.vehicle_id, { customer, date, endMs });
+    }
+    const map = new Map<string, { customer: string; date: string }>();
+    best.forEach((v, vid) => map.set(vid, { customer: v.customer, date: v.date }));
+    return map;
+  }, [activeOutgoingRentals, t]);
+
+  const toggleAvailabilityMutation = useMutation({
+    mutationFn: async ({ vehicleId, nextStatus }: { vehicleId: string; nextStatus: "AVAILABLE" | "OFFLINE" }) => {
+      const { error } = await db()
+        .from("vehicles")
+        .update({ current_status: nextStatus })
+        .eq("id", vehicleId)
+        .eq("business_id", businessId);
+      if (error) throw new Error(error.message);
+    },
+    onMutate: ({ vehicleId }) => setTogglingVehicleId(vehicleId),
+    onSettled: () => setTogglingVehicleId(null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "vehicles", businessId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "rental"] });
+    },
+    onError: (e: Error) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   const form = useForm<InsertVehicle>({
@@ -154,6 +251,9 @@ export default function VehiclesPage() {
       default: return type;
     }
   }
+
+  const canToggleAvailability = (status: Vehicle["current_status"]) =>
+    status === "AVAILABLE" || status === "OFFLINE";
 
   const handleSync = async () => {
     setSyncing(true);
@@ -305,7 +405,46 @@ export default function VehiclesPage() {
                       <TableCell className="text-[#64748b]">{rentalTypeLabel(v.rental_type)}</TableCell>
                       <TableCell className="text-[#64748b]">{v.ownership_type}</TableCell>
                       <TableCell className="text-right text-[#1e293b]">{new Intl.NumberFormat("en-RW").format(v.base_rate)}</TableCell>
-                      <TableCell><Badge variant={statusVariant(v.current_status) as "default" | "secondary" | "destructive" | "outline"} className={statusBadgeClass(v.current_status)}>{v.current_status.replace("_", " ")}</Badge></TableCell>
+                      <TableCell>
+                        {canToggleAvailability(v.current_status) ? (
+                          <div className="flex items-center gap-3 flex-wrap" data-testid={`cell-availability-${v.id}`}>
+                            <Switch
+                              checked={v.current_status === "AVAILABLE"}
+                              disabled={
+                                togglingVehicleId === v.id ||
+                                (v.current_status === "AVAILABLE" && activeRentalsLoading)
+                              }
+                              onCheckedChange={(checked) => {
+                                if (v.current_status === "AVAILABLE" && !checked) {
+                                  const block = activeRentalByVehicleId.get(v.id);
+                                  if (block) {
+                                    setAvailabilityBlock(block);
+                                    return;
+                                  }
+                                }
+                                toggleAvailabilityMutation.mutate({
+                                  vehicleId: v.id,
+                                  nextStatus: checked ? "AVAILABLE" : "OFFLINE",
+                                });
+                              }}
+                              aria-label={t("vehicles.toggle_availability_aria")}
+                              data-testid={`switch-availability-${v.id}`}
+                            />
+                            <span className="text-xs text-[#64748b] whitespace-nowrap">
+                              {v.current_status === "AVAILABLE"
+                                ? t("vehicles.availability_enabled")
+                                : t("vehicles.availability_disabled")}
+                            </span>
+                          </div>
+                        ) : (
+                          <Badge
+                            variant={statusVariant(v.current_status) as "default" | "secondary" | "destructive" | "outline"}
+                            className={statusBadgeClass(v.current_status)}
+                          >
+                            {v.current_status.replace("_", " ")}
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-[#64748b]">{v.current_location || "—"}</TableCell>
                       <TableCell className="text-right">
                         <TooltipProvider>
@@ -335,6 +474,25 @@ export default function VehiclesPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={availabilityBlock != null} onOpenChange={(isOpen) => !isOpen && setAvailabilityBlock(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("vehicles.cannot_deactivate_title")}</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#334155]">
+              {availabilityBlock
+                ? t("vehicles.cannot_deactivate_rental", {
+                    customer: availabilityBlock.customer,
+                    date: availabilityBlock.date,
+                  })
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setAvailabilityBlock(null)}>{t("vehicles.cannot_deactivate_ok")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
