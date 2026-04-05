@@ -29,6 +29,7 @@ import PaymentsPage from "@/pages/payments";
 import VehiclesPage from "@/pages/vehicles";
 import ExternalOwnersPage from "@/pages/external-owners";
 import RentalsPage from "@/pages/rentals";
+import RentalWorkingLogPage from "@/pages/rental-working-log";
 import ReportsPage from "@/pages/reports";
 import StockPage from "@/pages/stock";
 import NotificationsPage from "@/pages/notifications";
@@ -55,6 +56,7 @@ function OwnerRouter() {
       <Route path="/external-owners" component={ExternalOwnersPage} />
       <Route path="/rentals/outgoing">{() => <RentalsPage direction="OUTGOING" />}</Route>
       <Route path="/rentals/incoming">{() => <RentalsPage direction="INCOMING" />}</Route>
+      <Route path="/rentals/working-log" component={RentalWorkingLogPage} />
       <Route path="/maintenance" component={MaintenancePage} />
       <Route path="/reports" component={ReportsPage} />
       <Route path="/stock" component={StockPage} />

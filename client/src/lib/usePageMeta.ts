@@ -20,6 +20,7 @@ const routeTitleKey: Record<string, string> = {
   "/vehicles": "vehicles.title",
   "/external-owners": "external_owners.title",
   "/rentals/outgoing": "rentals.outgoing_title",
+  "/rentals/working-log": "rental_usage.title",
   "/rentals/incoming": "rentals.incoming_title",
   "/reports": "nav.reports",
   "/notifications": "nav.notifications",

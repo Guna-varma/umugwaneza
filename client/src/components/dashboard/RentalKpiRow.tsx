@@ -57,18 +57,25 @@ export function RentalKpiRow({ rental }: { rental: RentalStats }) {
         data-testid="text-stat-maintenance"
       />
       <DashboardKpiCard
-        title={t("dashboard.today_rental_revenue")}
-        value={formatRWF(Number(rental.todayRevenue) ?? 0)}
+        title={t("dashboard.today_rental_billable")}
+        value={formatRWF(Number(rental.todayEarnedOutgoing) ?? 0)}
         icon={Banknote}
         color="#10b981"
         data-testid="text-stat-today-rental-revenue"
       />
       <DashboardKpiCard
-        title={t("dashboard.monthly_rental_income")}
-        value={formatRWF(Number(rental.monthRevenue) ?? 0)}
+        title={t("dashboard.monthly_rental_billable")}
+        value={formatRWF(Number(rental.monthEarnedOutgoing) ?? 0)}
         icon={Banknote}
         color="#10b981"
         data-testid="text-stat-monthly-rental-income"
+      />
+      <DashboardKpiCard
+        title={t("dashboard.monthly_rental_income")}
+        value={formatRWF(Number(rental.monthRevenue) ?? 0)}
+        icon={Banknote}
+        color="#0ea5e9"
+        data-testid="text-stat-monthly-rental-collected"
       />
       <DashboardKpiCard
         title={t("dashboard.monthly_rental_expense")}

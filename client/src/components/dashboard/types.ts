@@ -25,6 +25,10 @@ export type RentalStats = {
   maintenanceExpenseYTD?: number;
   maintenanceDowntimeDaysMonth?: number;
   maintenanceRecordCountMonth?: number;
+  /** Billable amount from logged working days/hours (outgoing), today */
+  todayEarnedOutgoing?: number;
+  /** Billable amount from logged working days/hours (outgoing), this month */
+  monthEarnedOutgoing?: number;
 };
 
 export type MonthlyRentalPoint = {

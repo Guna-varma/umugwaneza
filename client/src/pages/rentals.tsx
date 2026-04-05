@@ -21,7 +21,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, ArrowUpRight, ArrowDownLeft, CreditCard, AlertCircle } from "lucide-react";
+import { Link } from "wouter";
+import { Plus, ArrowUpRight, ArrowDownLeft, CreditCard, AlertCircle, CalendarDays } from "lucide-react";
 
 function formatRWF(amount: number) {
   return new Intl.NumberFormat("en-RW").format(Math.round(amount)) + " RWF";
@@ -192,6 +193,8 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["umugwaneza", "rental_contracts", businessId, direction] });
       queryClient.invalidateQueries({ queryKey: ["umugwaneza", "vehicles", businessId] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "rental_usage"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       toast({ title: t("common.contract_completed") });
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
@@ -266,7 +269,11 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
                     <FormItem><FormLabel>{t("rentals.charge_customer_per")}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value || "DAY"} disabled={!isVehicleAvailable}>
                         <FormControl><SelectTrigger disabled={!isVehicleAvailable}><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent><SelectItem value="DAY">{t("vehicles.day")}</SelectItem><SelectItem value="HOUR">{t("vehicles.hour")}</SelectItem></SelectContent>
+                        <SelectContent>
+                          <SelectItem value="DAY">{t("vehicles.day")}</SelectItem>
+                          <SelectItem value="MONTH">{t("vehicles.month")}</SelectItem>
+                          <SelectItem value="HOUR">{t("vehicles.hour")}</SelectItem>
+                        </SelectContent>
                       </Select>
                       <p className="text-xs text-[#64748b]">{t("rentals.charge_customer_per_hint")}</p>
                       <FormMessage />
@@ -412,6 +419,13 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
                       <TableCell><Badge variant={opsVariant(c.operational_status)}>{c.operational_status}</Badge></TableCell>
                       <TableCell>
                         <div className="flex gap-2 flex-wrap">
+                          {isOutgoing && (
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/rentals/working-log?contract=${c.id}`} className="inline-flex items-center gap-1" data-testid={`button-usage-${c.id}`}>
+                                <CalendarDays className="h-3.5 w-3.5" /> {t("rentals.working_days")}
+                              </Link>
+                            </Button>
+                          )}
                           {c.operational_status === "ACTIVE" && c.remaining_amount > 0 && (
                             <Button variant="outline" size="sm" onClick={() => {
                               setSelectedContract(c);

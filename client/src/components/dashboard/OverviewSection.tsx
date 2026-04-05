@@ -51,8 +51,8 @@ export function OverviewSection({
           data-testid="text-stat-overview-total-vehicles"
         />
         <DashboardKpiCard
-          title={t("dashboard.monthly_rental_revenue")}
-          value={formatRWF(Number(rental.monthRevenue) ?? 0)}
+          title={t("dashboard.monthly_rental_billable")}
+          value={formatRWF(Number(rental.monthEarnedOutgoing) ?? 0)}
           icon={Banknote}
           color="#10b981"
           data-testid="text-stat-overview-monthly-rental-revenue"

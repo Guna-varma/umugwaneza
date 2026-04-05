@@ -16,7 +16,7 @@ export function InsightsPanel({
   const monthlyProfit = Number(grocery.monthlyProfit) || 0;
   const payables = Number(grocery.payables) || 0;
   const receivables = Number(grocery.receivables) || 0;
-  const monthRevenue = Number(rental.monthRevenue) || 0;
+  const monthBillable = Number(rental.monthEarnedOutgoing) || 0;
   const totalVehicles = Number(rental.total) || 0;
   const rentedOut = Number(rental.rentedOut) || 0;
 
@@ -45,10 +45,10 @@ export function InsightsPanel({
         " RWF payables."
     );
   }
-  if (monthRevenue > 0) {
+  if (monthBillable > 0) {
     points.push(
-      "Rental revenue this month: " +
-        new Intl.NumberFormat("en-RW").format(Math.round(monthRevenue)) +
+      "Rental billable this month (from working days/hours): " +
+        new Intl.NumberFormat("en-RW").format(Math.round(monthBillable)) +
         " RWF."
     );
   }

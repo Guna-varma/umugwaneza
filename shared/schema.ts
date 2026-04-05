@@ -167,6 +167,19 @@ export type RentalPayment = {
   created_at: string;
 };
 
+/** One calendar day within a contract: trucks use day_fraction; machines on HOUR use machine_hours (and optional day_fraction for half/full reporting). */
+export type RentalUsage = {
+  id: string;
+  business_id: string;
+  rental_contract_id: string;
+  usage_date: string;
+  day_fraction: number;
+  machine_hours: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MaintenanceRecord = {
   id: string;
   business_id: string;
@@ -301,6 +314,15 @@ export const insertRentalPaymentSchema = z.object({
   notes: z.string().nullable().default(null),
 });
 export type InsertRentalPayment = z.infer<typeof insertRentalPaymentSchema>;
+
+export const insertRentalUsageSchema = z.object({
+  rental_contract_id: z.string().min(1),
+  usage_date: z.string().min(1),
+  day_fraction: z.number().min(0).max(1),
+  machine_hours: z.number().min(0).nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+export type InsertRentalUsage = z.infer<typeof insertRentalUsageSchema>;
 
 export type AuthUser = {
   role: "SYSTEM_ADMIN" | "OWNER";

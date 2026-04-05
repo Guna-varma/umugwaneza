@@ -19,6 +19,7 @@ import {
   Building2,
   LogOut,
   Wrench,
+  CalendarDays,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import {
@@ -72,6 +73,7 @@ export function AppSidebar() {
         { title: t("nav.fleet_customers", "Customers"), url: "/fleet/customers", icon: UserCheck },
         { title: t("nav.external_owners"), url: "/external-owners", icon: UserPlus },
         { title: t("nav.outgoing_rental"), url: "/rentals/outgoing", icon: ArrowUpRight },
+        { title: t("nav.rental_working_log"), url: "/rentals/working-log", icon: CalendarDays },
         { title: t("nav.incoming_rental"), url: "/rentals/incoming", icon: ArrowDownLeft },
       ],
     },
