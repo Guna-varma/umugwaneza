@@ -423,7 +423,18 @@
     "no_incoming": "Nta masezerano ku banyir'ibikoresho",
     "create_first": "Kora amasezerano ya mbere yo gukodesha",
     "vehicle_not_available": "Iyi modoka ntabwo iri. Hitamo indi modoka komeza.",
-    "working_days": "Iminsi y'akazi"
+    "working_days": "Iminsi y'akazi",
+    "billing_basis": "Uburyo bw'igihe",
+    "unit_rate": "Igiciro cy'amasezerano",
+    "per_day_rent": "Igiciro ku munsi",
+    "per_day_rent_hint": "Ukwezi: igiciro ÷ 30",
+    "per_day_suffix": "ku munsi",
+    "rate_suffix_day": "ku munsi",
+    "rate_suffix_month": "ku kwezi",
+    "rate_suffix_hour": "ku isaha",
+    "basis_day": "Ku munsi",
+    "basis_month": "Ku kwezi",
+    "basis_hour": "Ku isaha"
   },
   "rental_usage": {
     "title": "Iminsi y'akazi n'amasaaha",

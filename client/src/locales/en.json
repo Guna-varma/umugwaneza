@@ -447,7 +447,18 @@
     "no_incoming": "No rent from owners yet",
     "create_first": "Create your first rental contract",
     "vehicle_not_available": "This vehicle is not available. Select another vehicle to continue.",
-    "working_days": "Working days"
+    "working_days": "Working days",
+    "billing_basis": "Charge basis",
+    "unit_rate": "Contract rate",
+    "per_day_rent": "Per day rent",
+    "per_day_rent_hint": "Monthly: rate ÷ 30",
+    "per_day_suffix": "per day",
+    "rate_suffix_day": "per day",
+    "rate_suffix_month": "per month",
+    "rate_suffix_hour": "per hour",
+    "basis_day": "Per day",
+    "basis_month": "Per month",
+    "basis_hour": "Per hour"
   },
   "rental_usage": {
     "title": "Rental working days & hours",

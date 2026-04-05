@@ -23,6 +23,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { Plus, ArrowUpRight, ArrowDownLeft, CreditCard, AlertCircle, CalendarDays } from "lucide-react";
+import { perDayEquivalentRwf } from "@/lib/rentalUsage";
 
 function formatRWF(amount: number) {
   return new Intl.NumberFormat("en-RW").format(Math.round(amount)) + " RWF";
@@ -38,6 +39,13 @@ function opsVariant(status: string) {
   if (status === "ACTIVE") return "default";
   if (status === "COMPLETED") return "secondary";
   return "destructive";
+}
+
+function rentalTypeLabel(t: (k: string) => string, rentalType: string | null | undefined) {
+  const rt = rentalType || "DAY";
+  if (rt === "MONTH") return t("rentals.basis_month");
+  if (rt === "HOUR") return t("rentals.basis_hour");
+  return t("rentals.basis_day");
 }
 
 function calculateTotal(start: string, end: string, rate: number, rentalType: string) {
@@ -399,6 +407,12 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
                     <TableHead className="text-[#64748b]">{isOutgoing ? t("rentals.customer") : t("rentals.external_owner")}</TableHead>
                     <TableHead className="text-[#64748b]">{t("rentals.start")}</TableHead>
                     <TableHead className="text-[#64748b]">{t("rentals.end")}</TableHead>
+                    <TableHead className="text-[#64748b] min-w-[7rem]">{t("rentals.billing_basis")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right min-w-[8rem]">{t("rentals.unit_rate")}</TableHead>
+                    <TableHead className="text-[#64748b] text-right min-w-[8rem]">
+                      <span className="block">{t("rentals.per_day_rent")}</span>
+                      <span className="block text-[10px] font-normal text-[#94a3b8] normal-case">{t("rentals.per_day_rent_hint")}</span>
+                    </TableHead>
                     <TableHead className="text-[#64748b] text-right">{t("rentals.total_rwf")}</TableHead>
                     <TableHead className="text-[#64748b] text-right">{t("rentals.paid_rwf")}</TableHead>
                     <TableHead className="text-[#64748b]">{t("rentals.financial")}</TableHead>
@@ -413,6 +427,35 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
                       <TableCell className="text-[#64748b]">{isOutgoing ? c.customer?.customer_name : c.external_owner?.owner_name || "—"}</TableCell>
                       <TableCell className="text-[#64748b] text-xs">{new Date(c.rental_start_datetime).toLocaleString()}</TableCell>
                       <TableCell className="text-[#64748b] text-xs">{new Date(c.rental_end_datetime).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-normal text-xs border-[#cbd5e1] text-[#475569]">
+                          {rentalTypeLabel(t, c.rental_type)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-[#1e293b]">
+                        <span className="font-medium tabular-nums">{formatRWF(c.rate)}</span>
+                        <span className="block text-[10px] text-[#64748b] mt-0.5">
+                          {(c.rental_type || "DAY") === "MONTH"
+                            ? t("rentals.rate_suffix_month")
+                            : (c.rental_type || "DAY") === "HOUR"
+                              ? t("rentals.rate_suffix_hour")
+                              : t("rentals.rate_suffix_day")}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right text-[#1e293b]">
+                        {(() => {
+                          const pd = perDayEquivalentRwf(c.rate, c.rental_type);
+                          if (pd == null) {
+                            return <span className="text-[#94a3b8] text-sm">—</span>;
+                          }
+                          return (
+                            <>
+                              <span className="font-medium tabular-nums">{formatRWF(pd)}</span>
+                              <span className="block text-[10px] text-[#64748b] mt-0.5">{t("rentals.per_day_suffix")}</span>
+                            </>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell className="text-right text-[#1e293b]">{formatRWF(c.total_amount)}</TableCell>
                       <TableCell className="text-right text-[#1e293b]">{formatRWF(c.amount_paid)}</TableCell>
                       <TableCell><Badge variant={financialVariant(c.financial_status)}>{c.financial_status.replace("_", " ")}</Badge></TableCell>
