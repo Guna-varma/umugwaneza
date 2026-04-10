@@ -7,6 +7,15 @@ import { db } from "@/lib/supabase";
 import { useLocation, Link } from "wouter";
 import type { RentalContract, RentalUsage, Vehicle, Customer } from "@shared/schema";
 import { rentalUsageLineCharge } from "@/lib/rentalUsage";
+import { exportReportWorkbook } from "@/lib/reportWorkbook";
+import {
+  buildCustomerBreakdownRows,
+  buildMonthlyRentalReportRows,
+  buildRentalUsageExecutiveSummary,
+  buildVehicleBreakdownRows,
+  buildWeeklyRentalReportRows,
+  type RentalUsageDetailRow,
+} from "@/lib/rentalReportAnalytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,15 +29,21 @@ import {
   eachDayOfInterval,
   format,
   parseISO,
-  startOfWeek,
-  endOfWeek,
   startOfMonth,
   endOfMonth,
   differenceInCalendarDays,
   startOfDay,
 } from "date-fns";
-import * as XLSX from "xlsx";
-import { CalendarDays, Download, Save, ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  BarChart3,
+  CalendarDays,
+  Download,
+  Receipt,
+  Save,
+  Truck,
+  Users,
+} from "lucide-react";
 
 type DayRow = {
   usage_date: string;
@@ -43,6 +58,13 @@ type UsageWithContract = RentalUsage & {
 
 function formatRWF(amount: number) {
   return new Intl.NumberFormat("en-RW").format(Math.round(amount)) + " RWF";
+}
+
+function formatDecimal(value: number, digits = 1) {
+  return new Intl.NumberFormat("en-RW", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
 }
 
 function toYmd(d: Date): string {
@@ -277,68 +299,205 @@ export default function RentalWorkingLogPage() {
     },
   });
 
-  const dailyReportRows = useMemo(() => {
+  const dailyReportRows = useMemo<RentalUsageDetailRow[]>(() => {
     const rows = reportData ?? [];
     return rows.map((r) => {
       const rc = r.rental_contract;
       const rt = rc?.rental_type || "DAY";
       const charge = rentalUsageLineCharge(rt, rc?.rate ?? 0, r.day_fraction, r.machine_hours);
       return {
+        contractId: r.rental_contract_id,
         date: r.usage_date,
         vehicle: rc?.vehicle?.vehicle_name ?? "—",
         customer: rc?.customer?.customer_name ?? "—",
-        dayFraction: r.day_fraction,
-        hours: r.machine_hours,
+        dayUnits: r.day_fraction,
+        hours: r.machine_hours ?? 0,
         charge,
-        notes: r.notes,
+        notes: r.notes ?? "",
       };
     });
   }, [reportData]);
 
-  const weeklyReportRows = useMemo(() => {
-    const map = new Map<string, { weekLabel: string; charge: number; days: number; hours: number }>();
-    for (const r of dailyReportRows) {
-      const d = parseISO(r.date);
-      const wk = startOfWeek(d, { weekStartsOn: 1 });
-      const key = toYmd(wk);
-      const prev = map.get(key) ?? {
-        weekLabel: `${format(wk, "MMM d")} – ${format(endOfWeek(d, { weekStartsOn: 1 }), "MMM d, yyyy")}`,
-        charge: 0,
-        days: 0,
-        hours: 0,
-      };
-      prev.charge += r.charge;
-      prev.days += r.dayFraction;
-      prev.hours += r.hours ?? 0;
-      map.set(key, prev);
-    }
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([, v]) => v);
-  }, [dailyReportRows]);
+  const weeklyReportRows = useMemo(() => buildWeeklyRentalReportRows(dailyReportRows), [dailyReportRows]);
+  const monthlyReportRows = useMemo(() => buildMonthlyRentalReportRows(dailyReportRows), [dailyReportRows]);
+  const vehicleBreakdownRows = useMemo(() => buildVehicleBreakdownRows(dailyReportRows), [dailyReportRows]);
+  const customerBreakdownRows = useMemo(() => buildCustomerBreakdownRows(dailyReportRows), [dailyReportRows]);
+  const executiveSummary = useMemo(() => buildRentalUsageExecutiveSummary(dailyReportRows), [dailyReportRows]);
 
-  const monthlyReportRows = useMemo(() => {
-    const map = new Map<string, { month: string; charge: number; days: number; hours: number }>();
-    for (const r of dailyReportRows) {
-      const d = parseISO(r.date);
-      const m = startOfMonth(d);
-      const key = format(m, "yyyy-MM");
-      const prev = map.get(key) ?? { month: format(m, "MMMM yyyy"), charge: 0, days: 0, hours: 0 };
-      prev.charge += r.charge;
-      prev.days += r.dayFraction;
-      prev.hours += r.hours ?? 0;
-      map.set(key, prev);
-    }
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([, v]) => v);
-  }, [dailyReportRows]);
+  const selectedReportContract = useMemo(
+    () => contracts?.find((contract) => contract.id === reportContractFilter) ?? null,
+    [contracts, reportContractFilter],
+  );
 
-  const exportExcel = (sheetName: string, rows: Record<string, string | number>[]) => {
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
-    XLSX.writeFile(wb, `umugwaneza-rental-${sheetName.replace(/\s+/g, "-")}-${reportFrom}_to_${reportTo}.xlsx`);
+  const activePeriodRows = reportGranularity === "weekly"
+    ? weeklyReportRows
+    : reportGranularity === "monthly"
+      ? monthlyReportRows
+      : [];
+
+  const activePeriodTotals = useMemo(
+    () =>
+      activePeriodRows.reduce(
+        (totals, row) => ({
+          charge: totals.charge + row.charge,
+          dayUnits: totals.dayUnits + row.dayUnits,
+          hours: totals.hours + row.hours,
+          entries: totals.entries + row.entries,
+          contracts: totals.contracts + row.contractCount,
+        }),
+        { charge: 0, dayUnits: 0, hours: 0, entries: 0, contracts: 0 },
+      ),
+    [activePeriodRows],
+  );
+
+  const exportUsageWorkbook = (granularity: "daily" | "weekly" | "monthly") => {
+    const detailSection =
+      granularity === "daily"
+        ? {
+            title: t("rental_usage.detail_section_daily"),
+            columns: [
+              { key: "date", label: t("rental_usage.col_date") },
+              { key: "vehicle", label: t("rentals.vehicle") },
+              { key: "customer", label: t("rentals.customer") },
+              { key: "dayUnits", label: t("rental_usage.day_units") },
+              { key: "hours", label: t("rental_usage.col_hours") },
+              { key: "charge", label: t("rental_usage.col_charge") },
+              { key: "notes", label: t("rental_usage.col_notes") },
+            ],
+            rows: dailyReportRows.map((row) => ({
+              date: row.date,
+              vehicle: row.vehicle,
+              customer: row.customer,
+              dayUnits: Number(row.dayUnits.toFixed(2)),
+              hours: Number(row.hours.toFixed(1)),
+              charge: Math.round(row.charge),
+              notes: row.notes || "—",
+            })),
+            emptyMessage: t("reports.no_data"),
+          }
+        : {
+            title:
+              granularity === "weekly"
+                ? t("rental_usage.detail_section_weekly")
+                : t("rental_usage.detail_section_monthly"),
+            columns: [
+              { key: "periodLabel", label: t("rental_usage.col_period") },
+              { key: "vehicle", label: t("rentals.vehicle") },
+              { key: "customer", label: t("rentals.customer") },
+              { key: "contractCount", label: t("rental_usage.col_contracts") },
+              { key: "entries", label: t("rental_usage.col_entries") },
+              { key: "dayUnits", label: t("rental_usage.day_units") },
+              { key: "hours", label: t("rental_usage.col_hours") },
+              { key: "charge", label: t("rental_usage.col_charge") },
+            ],
+            rows: (granularity === "weekly" ? weeklyReportRows : monthlyReportRows).map((row) => ({
+              periodLabel: row.periodLabel,
+              vehicle: row.vehicle,
+              customer: row.customer,
+              contractCount: row.contractCount,
+              entries: row.entries,
+              dayUnits: Number(row.dayUnits.toFixed(2)),
+              hours: Number(row.hours.toFixed(1)),
+              charge: Math.round(row.charge),
+            })),
+            emptyMessage: t("reports.no_data"),
+          };
+
+    exportReportWorkbook({
+      fileName: `umugwaneza-rental-${granularity}-${reportFrom}_to_${reportTo}.xlsx`,
+      sheetName: `${granularity}-report`,
+      title: t("rental_usage.export_title"),
+      subtitle: `${t("rental_usage.report_label_granularity")}: ${t(`rental_usage.report_${granularity}`)}`,
+      filters: [
+        { label: t("rental_usage.report_from"), value: reportFrom },
+        { label: t("rental_usage.report_to"), value: reportTo },
+        {
+          label: t("rental_usage.report_contract"),
+          value: selectedReportContract
+            ? `${selectedReportContract.vehicle?.vehicle_name ?? "—"} - ${selectedReportContract.customer?.customer_name ?? "—"}`
+            : t("rental_usage.all_contracts"),
+        },
+      ],
+      metrics: [
+        {
+          label: t("rental_usage.summary_total_charge"),
+          value: Math.round(executiveSummary.totalCharge),
+          hint: `${executiveSummary.contractCount} ${t("reports.contracts")}`,
+        },
+        {
+          label: t("rental_usage.summary_total_entries"),
+          value: executiveSummary.totalEntries,
+          hint: `${executiveSummary.vehicleCount} ${t("rental_usage.summary_active_vehicles").toLowerCase()}`,
+        },
+        {
+          label: t("rental_usage.summary_total_day_units"),
+          value: Number(executiveSummary.totalDayUnits.toFixed(2)),
+          hint: executiveSummary.totalHours > 0 ? `${formatDecimal(executiveSummary.totalHours, 1)} h` : "",
+        },
+        {
+          label: t("rental_usage.summary_avg_entry_charge"),
+          value: Math.round(executiveSummary.averageChargePerEntry),
+          hint: t("rental_usage.summary_avg_entry_charge_hint"),
+        },
+        {
+          label: t("rental_usage.summary_top_vehicle"),
+          value: executiveSummary.topVehicleLabel,
+          hint: formatRWF(executiveSummary.topVehicleCharge),
+        },
+        {
+          label: t("rental_usage.summary_top_customer"),
+          value: executiveSummary.topCustomerLabel,
+          hint: formatRWF(executiveSummary.topCustomerCharge),
+        },
+      ],
+      sections: [
+        detailSection,
+        {
+          title: t("rental_usage.vehicle_summary"),
+          columns: [
+            { key: "label", label: t("rentals.vehicle") },
+            { key: "contractCount", label: t("rental_usage.col_contracts") },
+            { key: "entries", label: t("rental_usage.col_entries") },
+            { key: "dayUnits", label: t("rental_usage.day_units") },
+            { key: "hours", label: t("rental_usage.col_hours") },
+            { key: "charge", label: t("rental_usage.col_charge") },
+            { key: "avgChargePerEntry", label: t("rental_usage.col_average_charge") },
+          ],
+          rows: vehicleBreakdownRows.map((row) => ({
+            label: row.label,
+            contractCount: row.contractCount,
+            entries: row.entries,
+            dayUnits: Number(row.dayUnits.toFixed(2)),
+            hours: Number(row.hours.toFixed(1)),
+            charge: Math.round(row.charge),
+            avgChargePerEntry: Math.round(row.avgChargePerEntry),
+          })),
+          emptyMessage: t("reports.no_data"),
+        },
+        {
+          title: t("rental_usage.customer_summary"),
+          columns: [
+            { key: "label", label: t("rentals.customer") },
+            { key: "contractCount", label: t("rental_usage.col_contracts") },
+            { key: "entries", label: t("rental_usage.col_entries") },
+            { key: "dayUnits", label: t("rental_usage.day_units") },
+            { key: "hours", label: t("rental_usage.col_hours") },
+            { key: "charge", label: t("rental_usage.col_charge") },
+            { key: "avgChargePerEntry", label: t("rental_usage.col_average_charge") },
+          ],
+          rows: customerBreakdownRows.map((row) => ({
+            label: row.label,
+            contractCount: row.contractCount,
+            entries: row.entries,
+            dayUnits: Number(row.dayUnits.toFixed(2)),
+            hours: Number(row.hours.toFixed(1)),
+            charge: Math.round(row.charge),
+            avgChargePerEntry: Math.round(row.avgChargePerEntry),
+          })),
+          emptyMessage: t("reports.no_data"),
+        },
+      ],
+    });
   };
 
   const updateRow = (idx: number, patch: Partial<DayRow>) => {
@@ -674,6 +833,73 @@ export default function RentalWorkingLogPage() {
             <Skeleton className="h-40 w-full" />
           ) : (
             <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="rounded-xl border border-[#dbeafe] bg-[#eff6ff] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-[#2563eb]">{t("rental_usage.summary_total_charge")}</p>
+                      <p className="mt-2 text-2xl font-bold text-[#1e3a8a]">{formatRWF(executiveSummary.totalCharge)}</p>
+                      <p className="mt-1 text-xs text-[#475569]">{executiveSummary.contractCount} {t("reports.contracts")}</p>
+                    </div>
+                    <Receipt className="h-8 w-8 text-[#2563eb]" />
+                  </div>
+                </div>
+                <div className="rounded-xl border border-[#dcfce7] bg-[#f0fdf4] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-[#15803d]">{t("rental_usage.summary_total_day_units")}</p>
+                      <p className="mt-2 text-2xl font-bold text-[#166534]">{formatDecimal(executiveSummary.totalDayUnits, 2)}</p>
+                      <p className="mt-1 text-xs text-[#475569]">
+                        {executiveSummary.totalHours > 0
+                          ? `${formatDecimal(executiveSummary.totalHours, 1)} ${t("rental_usage.col_hours").toLowerCase()}`
+                          : `${executiveSummary.totalEntries} ${t("rental_usage.summary_total_entries").toLowerCase()}`}
+                      </p>
+                    </div>
+                    <CalendarDays className="h-8 w-8 text-[#16a34a]" />
+                  </div>
+                </div>
+                <div className="rounded-xl border border-[#ede9fe] bg-[#f5f3ff] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-[#6d28d9]">{t("rental_usage.summary_active_vehicles")}</p>
+                      <p className="mt-2 text-2xl font-bold text-[#5b21b6]">{executiveSummary.vehicleCount}</p>
+                      <p className="mt-1 text-xs text-[#475569]">{executiveSummary.customerCount} {t("rental_usage.summary_active_customers").toLowerCase()}</p>
+                    </div>
+                    <Truck className="h-8 w-8 text-[#7c3aed]" />
+                  </div>
+                </div>
+                <div className="rounded-xl border border-[#fef3c7] bg-[#fffbeb] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-[#b45309]">{t("rental_usage.summary_avg_entry_charge")}</p>
+                      <p className="mt-2 text-2xl font-bold text-[#92400e]">{formatRWF(executiveSummary.averageChargePerEntry)}</p>
+                      <p className="mt-1 text-xs text-[#475569]">{t("rental_usage.summary_avg_entry_charge_hint")}</p>
+                    </div>
+                    <BarChart3 className="h-8 w-8 text-[#d97706]" />
+                  </div>
+                </div>
+                <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-[#334155]">{t("rental_usage.summary_top_vehicle")}</p>
+                      <p className="mt-2 text-lg font-bold text-[#0f172a]">{executiveSummary.topVehicleLabel}</p>
+                      <p className="mt-1 text-xs text-[#475569]">{formatRWF(executiveSummary.topVehicleCharge)}</p>
+                    </div>
+                    <Truck className="h-8 w-8 text-[#475569]" />
+                  </div>
+                </div>
+                <div className="rounded-xl border border-[#e0f2fe] bg-[#f0f9ff] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-[#0369a1]">{t("rental_usage.summary_top_customer")}</p>
+                      <p className="mt-2 text-lg font-bold text-[#0f172a]">{executiveSummary.topCustomerLabel}</p>
+                      <p className="mt-1 text-xs text-[#475569]">{formatRWF(executiveSummary.topCustomerCharge)}</p>
+                    </div>
+                    <Users className="h-8 w-8 text-[#0284c7]" />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -709,20 +935,7 @@ export default function RentalWorkingLogPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      exportExcel(
-                        "daily",
-                        dailyReportRows.map((r) => ({
-                          Date: r.date,
-                          Vehicle: r.vehicle,
-                          Customer: r.customer,
-                          Day_units: r.dayFraction,
-                          Hours: r.hours ?? "",
-                          Charge_RWF: Math.round(r.charge),
-                          Notes: r.notes ?? "",
-                        })),
-                      )
-                    }
+                    onClick={() => exportUsageWorkbook("daily")}
                   >
                     <Download className="h-4 w-4 mr-2" /> {t("rental_usage.export_excel")}
                   </Button>
@@ -744,11 +957,19 @@ export default function RentalWorkingLogPage() {
                             <TableCell>{r.date}</TableCell>
                             <TableCell>{r.vehicle}</TableCell>
                             <TableCell>{r.customer}</TableCell>
-                            <TableCell>{r.dayFraction}</TableCell>
-                            <TableCell>{r.hours ?? "—"}</TableCell>
+                            <TableCell>{formatDecimal(r.dayUnits, 2)}</TableCell>
+                            <TableCell>{r.hours > 0 ? formatDecimal(r.hours, 1) : "—"}</TableCell>
                             <TableCell className="text-right">{formatRWF(r.charge)}</TableCell>
                           </TableRow>
                         ))}
+                        {dailyReportRows.length > 0 && (
+                          <TableRow className="bg-[#f8fafc] font-semibold">
+                            <TableCell colSpan={3}>{t("reports.totals")}</TableCell>
+                            <TableCell>{formatDecimal(executiveSummary.totalDayUnits, 2)}</TableCell>
+                            <TableCell>{executiveSummary.totalHours > 0 ? formatDecimal(executiveSummary.totalHours, 1) : "—"}</TableCell>
+                            <TableCell className="text-right">{formatRWF(executiveSummary.totalCharge)}</TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </div>
@@ -760,40 +981,50 @@ export default function RentalWorkingLogPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      exportExcel(
-                        "weekly",
-                        weeklyReportRows.map((r) => ({
-                          Week: r.weekLabel,
-                          Charge_RWF: Math.round(r.charge),
-                          Day_units: r.days.toFixed(2),
-                          Hours: r.hours.toFixed(1),
-                        })),
-                      )
-                    }
+                    onClick={() => exportUsageWorkbook("weekly")}
                   >
                     <Download className="h-4 w-4 mr-2" /> {t("rental_usage.export_excel")}
                   </Button>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("rental_usage.week")}</TableHead>
-                        <TableHead className="text-right">{t("rental_usage.col_charge")}</TableHead>
-                        <TableHead>{t("rental_usage.day_units")}</TableHead>
-                        <TableHead>{t("rental_usage.col_hours")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {weeklyReportRows.map((r, i) => (
-                        <TableRow key={i}>
-                          <TableCell>{r.weekLabel}</TableCell>
-                          <TableCell className="text-right">{formatRWF(r.charge)}</TableCell>
-                          <TableCell>{r.days.toFixed(2)}</TableCell>
-                          <TableCell>{r.hours.toFixed(1)}</TableCell>
+                  <div className="overflow-x-auto border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t("rental_usage.week")}</TableHead>
+                          <TableHead>{t("rentals.vehicle")}</TableHead>
+                          <TableHead>{t("rentals.customer")}</TableHead>
+                          <TableHead>{t("rental_usage.col_contracts")}</TableHead>
+                          <TableHead>{t("rental_usage.col_entries")}</TableHead>
+                          <TableHead>{t("rental_usage.day_units")}</TableHead>
+                          <TableHead>{t("rental_usage.col_hours")}</TableHead>
+                          <TableHead className="text-right">{t("rental_usage.col_charge")}</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {weeklyReportRows.map((r, i) => (
+                          <TableRow key={i}>
+                            <TableCell>{r.periodLabel}</TableCell>
+                            <TableCell>{r.vehicle}</TableCell>
+                            <TableCell>{r.customer}</TableCell>
+                            <TableCell>{r.contractCount}</TableCell>
+                            <TableCell>{r.entries}</TableCell>
+                            <TableCell>{formatDecimal(r.dayUnits, 2)}</TableCell>
+                            <TableCell>{formatDecimal(r.hours, 1)}</TableCell>
+                            <TableCell className="text-right">{formatRWF(r.charge)}</TableCell>
+                          </TableRow>
+                        ))}
+                        {weeklyReportRows.length > 0 && (
+                          <TableRow className="bg-[#f8fafc] font-semibold">
+                            <TableCell colSpan={3}>{t("reports.totals")}</TableCell>
+                            <TableCell>{activePeriodTotals.contracts}</TableCell>
+                            <TableCell>{activePeriodTotals.entries}</TableCell>
+                            <TableCell>{formatDecimal(activePeriodTotals.dayUnits, 2)}</TableCell>
+                            <TableCell>{formatDecimal(activePeriodTotals.hours, 1)}</TableCell>
+                            <TableCell className="text-right">{formatRWF(activePeriodTotals.charge)}</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               )}
 
@@ -802,42 +1033,122 @@ export default function RentalWorkingLogPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      exportExcel(
-                        "monthly",
-                        monthlyReportRows.map((r) => ({
-                          Month: r.month,
-                          Charge_RWF: Math.round(r.charge),
-                          Day_units: r.days.toFixed(2),
-                          Hours: r.hours.toFixed(1),
-                        })),
-                      )
-                    }
+                    onClick={() => exportUsageWorkbook("monthly")}
                   >
                     <Download className="h-4 w-4 mr-2" /> {t("rental_usage.export_excel")}
                   </Button>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("rental_usage.month")}</TableHead>
-                        <TableHead className="text-right">{t("rental_usage.col_charge")}</TableHead>
-                        <TableHead>{t("rental_usage.day_units")}</TableHead>
-                        <TableHead>{t("rental_usage.col_hours")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {monthlyReportRows.map((r, i) => (
-                        <TableRow key={i}>
-                          <TableCell>{r.month}</TableCell>
-                          <TableCell className="text-right">{formatRWF(r.charge)}</TableCell>
-                          <TableCell>{r.days.toFixed(2)}</TableCell>
-                          <TableCell>{r.hours.toFixed(1)}</TableCell>
+                  <div className="overflow-x-auto border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t("rental_usage.month")}</TableHead>
+                          <TableHead>{t("rentals.vehicle")}</TableHead>
+                          <TableHead>{t("rentals.customer")}</TableHead>
+                          <TableHead>{t("rental_usage.col_contracts")}</TableHead>
+                          <TableHead>{t("rental_usage.col_entries")}</TableHead>
+                          <TableHead>{t("rental_usage.day_units")}</TableHead>
+                          <TableHead>{t("rental_usage.col_hours")}</TableHead>
+                          <TableHead className="text-right">{t("rental_usage.col_charge")}</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {monthlyReportRows.map((r, i) => (
+                          <TableRow key={i}>
+                            <TableCell>{r.periodLabel}</TableCell>
+                            <TableCell>{r.vehicle}</TableCell>
+                            <TableCell>{r.customer}</TableCell>
+                            <TableCell>{r.contractCount}</TableCell>
+                            <TableCell>{r.entries}</TableCell>
+                            <TableCell>{formatDecimal(r.dayUnits, 2)}</TableCell>
+                            <TableCell>{formatDecimal(r.hours, 1)}</TableCell>
+                            <TableCell className="text-right">{formatRWF(r.charge)}</TableCell>
+                          </TableRow>
+                        ))}
+                        {monthlyReportRows.length > 0 && (
+                          <TableRow className="bg-[#f8fafc] font-semibold">
+                            <TableCell colSpan={3}>{t("reports.totals")}</TableCell>
+                            <TableCell>{activePeriodTotals.contracts}</TableCell>
+                            <TableCell>{activePeriodTotals.entries}</TableCell>
+                            <TableCell>{formatDecimal(activePeriodTotals.dayUnits, 2)}</TableCell>
+                            <TableCell>{formatDecimal(activePeriodTotals.hours, 1)}</TableCell>
+                            <TableCell className="text-right">{formatRWF(activePeriodTotals.charge)}</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               )}
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pt-2">
+                <Card className="border border-[#e2e8f0]">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Truck className="h-4 w-4" /> {t("rental_usage.vehicle_summary")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t("rentals.vehicle")}</TableHead>
+                            <TableHead>{t("rental_usage.col_contracts")}</TableHead>
+                            <TableHead>{t("rental_usage.col_entries")}</TableHead>
+                            <TableHead>{t("rental_usage.day_units")}</TableHead>
+                            <TableHead className="text-right">{t("rental_usage.col_charge")}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {vehicleBreakdownRows.slice(0, 5).map((row) => (
+                            <TableRow key={row.label}>
+                              <TableCell>{row.label}</TableCell>
+                              <TableCell>{row.contractCount}</TableCell>
+                              <TableCell>{row.entries}</TableCell>
+                              <TableCell>{formatDecimal(row.dayUnits, 2)}</TableCell>
+                              <TableCell className="text-right">{formatRWF(row.charge)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-[#e2e8f0]">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="h-4 w-4" /> {t("rental_usage.customer_summary")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t("rentals.customer")}</TableHead>
+                            <TableHead>{t("rental_usage.col_contracts")}</TableHead>
+                            <TableHead>{t("rental_usage.col_entries")}</TableHead>
+                            <TableHead>{t("rental_usage.day_units")}</TableHead>
+                            <TableHead className="text-right">{t("rental_usage.col_charge")}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {customerBreakdownRows.slice(0, 5).map((row) => (
+                            <TableRow key={row.label}>
+                              <TableCell>{row.label}</TableCell>
+                              <TableCell>{row.contractCount}</TableCell>
+                              <TableCell>{row.entries}</TableCell>
+                              <TableCell>{formatDecimal(row.dayUnits, 2)}</TableCell>
+                              <TableCell className="text-right">{formatRWF(row.charge)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           )}
         </TabsContent>

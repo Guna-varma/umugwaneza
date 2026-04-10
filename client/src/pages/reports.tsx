@@ -1,7 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { db } from "@/lib/supabase";
+import { exportReportWorkbook } from "@/lib/reportWorkbook";
+import { useAuth } from "@/lib/useAuth";
+import { rentalUsageLineCharge } from "@/lib/rentalUsage";
+import {
+  buildCustomerBreakdownRows,
+  buildRentalUsageExecutiveSummary,
+  buildVehicleBreakdownRows,
+  type RentalUsageDetailRow,
+} from "@/lib/rentalReportAnalytics";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Download, Search } from "lucide-react";
+import { BarChart3, Download, FileText, Search, Truck, Wallet } from "lucide-react";
 
 function formatRWF(amount: number) {
   return new Intl.NumberFormat("en-RW").format(Math.round(amount));
@@ -45,6 +54,8 @@ const RENTAL_REPORT_TYPES = REPORT_TYPES.filter((rt) => rt.group === "rental");
 
 export default function ReportsPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const businessId = user?.business_id ?? "";
   const today = new Date().toISOString().split("T")[0];
   const currentMonth = String(new Date().getMonth() + 1);
   const currentYear = String(new Date().getFullYear());
@@ -96,22 +107,158 @@ export default function ReportsPage() {
     return out;
   }
 
+  function getMonthDateRange(month: string, year: string) {
+    const from = new Date(Number(year), Number(month) - 1, 1);
+    const to = new Date(Number(year), Number(month), 0);
+    const toYmd = (value: Date) => value.toISOString().split("T")[0];
+    return { from: toYmd(from), to: toYmd(to) };
+  }
+
+  async function fetchRentalUsageRangeReport(reportFrom: string, reportTo: string) {
+    if (!businessId) {
+      return {
+        reportSource: "rental_usage",
+        rows: [],
+        vehicleBreakdownRows: [],
+        customerBreakdownRows: [],
+        totalBillable: 0,
+        totalDayUnits: 0,
+        activeVehicles: 0,
+        activeCustomers: 0,
+        averageEntryCharge: 0,
+        topVehicle: "—",
+        topVehicleCharge: 0,
+        topCustomer: "—",
+        topCustomerCharge: 0,
+        totalEntries: 0,
+        contractCount: 0,
+      };
+    }
+
+    const { data: usage, error } = await db()
+      .from("rental_usage")
+      .select("*")
+      .eq("business_id", businessId)
+      .gte("usage_date", reportFrom)
+      .lte("usage_date", reportTo)
+      .order("usage_date", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    if (!usage?.length) {
+      return {
+        reportSource: "rental_usage",
+        rows: [],
+        vehicleBreakdownRows: [],
+        customerBreakdownRows: [],
+        totalBillable: 0,
+        totalDayUnits: 0,
+        activeVehicles: 0,
+        activeCustomers: 0,
+        averageEntryCharge: 0,
+        topVehicle: "—",
+        topVehicleCharge: 0,
+        topCustomer: "—",
+        topCustomerCharge: 0,
+        totalEntries: 0,
+        contractCount: 0,
+      };
+    }
+
+    const contractIds = Array.from(new Set(usage.map((row: any) => row.rental_contract_id)));
+    const { data: contracts, error: contractsError } = await db()
+      .from("rental_contracts")
+      .select("id, rate, rental_type, rental_direction, vehicle:vehicles(vehicle_name), customer:customers(customer_name)")
+      .eq("business_id", businessId)
+      .eq("rental_direction", "OUTGOING")
+      .in("id", contractIds);
+
+    if (contractsError) throw new Error(contractsError.message);
+
+    const contractMap = new Map(
+      (contracts ?? []).map((contract: any) => [
+        contract.id,
+        {
+          rate: Number(contract.rate) || 0,
+          rental_type: contract.rental_type || "DAY",
+          vehicle_name: Array.isArray(contract.vehicle) ? contract.vehicle[0]?.vehicle_name : contract.vehicle?.vehicle_name,
+          customer_name: Array.isArray(contract.customer) ? contract.customer[0]?.customer_name : contract.customer?.customer_name,
+        },
+      ]),
+    );
+
+    const detailRows: RentalUsageDetailRow[] = usage
+      .filter((row: any) => contractMap.has(row.rental_contract_id))
+      .map((row: any) => {
+        const contract = contractMap.get(row.rental_contract_id);
+        const charge = rentalUsageLineCharge(contract?.rental_type, contract?.rate ?? 0, row.day_fraction, row.machine_hours);
+        return {
+          contractId: row.rental_contract_id,
+          date: row.usage_date,
+          vehicle: contract?.vehicle_name ?? "—",
+          customer: contract?.customer_name ?? "—",
+          dayUnits: Number(row.day_fraction) || 0,
+          hours: Number(row.machine_hours) || 0,
+          charge,
+          notes: row.notes ?? "",
+        };
+      });
+
+    const executiveSummary = buildRentalUsageExecutiveSummary(detailRows);
+    const vehicleBreakdownRows = buildVehicleBreakdownRows(detailRows);
+    const customerBreakdownRows = buildCustomerBreakdownRows(detailRows);
+
+    return {
+      reportSource: "rental_usage",
+      rows: detailRows.map((row) => ({
+        date: row.date,
+        vehicle: row.vehicle,
+        customer: row.customer,
+        dayUnits: row.dayUnits,
+        hours: row.hours,
+        charge: row.charge,
+      })),
+      vehicleBreakdownRows,
+      customerBreakdownRows,
+      totalBillable: executiveSummary.totalCharge,
+      totalDayUnits: executiveSummary.totalDayUnits,
+      activeVehicles: executiveSummary.vehicleCount,
+      activeCustomers: executiveSummary.customerCount,
+      averageEntryCharge: executiveSummary.averageChargePerEntry,
+      topVehicle: executiveSummary.topVehicleLabel,
+      topVehicleCharge: executiveSummary.topVehicleCharge,
+      topCustomer: executiveSummary.topCustomerLabel,
+      topCustomerCharge: executiveSummary.topCustomerCharge,
+      totalEntries: executiveSummary.totalEntries,
+      contractCount: executiveSummary.contractCount,
+    };
+  }
+
   async function fetchReport(): Promise<any> {
     let data: any;
     switch (reportType) {
       case "daily": {
+        if (activeGroup === "rental") {
+          return fetchRentalUsageRangeReport(selectedDate, selectedDate);
+        }
         const res = await db().rpc("report_daily", { p_date: selectedDate });
         if (res.error) throw new Error(res.error.message);
         data = res.data;
         return normalizeReportPayload(data);
       }
       case "monthly": {
+        if (activeGroup === "rental") {
+          const range = getMonthDateRange(selectedMonth, selectedYear);
+          return fetchRentalUsageRangeReport(range.from, range.to);
+        }
         const res = await db().rpc("report_monthly", { p_month: parseInt(selectedMonth, 10), p_year: parseInt(selectedYear, 10) });
         if (res.error) throw new Error(res.error.message);
         data = res.data;
         return normalizeReportPayload(data);
       }
       case "custom": {
+        if (activeGroup === "rental") {
+          return fetchRentalUsageRangeReport(fromDate, toDate);
+        }
         const res = await db().rpc("report_custom", { p_from: fromDate, p_to: toDate });
         if (res.error) throw new Error(res.error.message);
         data = res.data;
@@ -189,7 +336,7 @@ export default function ReportsPage() {
     }
   }
 
-  const queryKey = ["report", reportType, selectedDate, selectedMonth, selectedYear, fromDate, toDate, supplierId, customerId, generateKey];
+  const queryKey = ["report", activeGroup, businessId, reportType, selectedDate, selectedMonth, selectedYear, fromDate, toDate, supplierId, customerId, generateKey];
   const { data: reportData, isLoading } = useQuery<any>({
     queryKey,
     queryFn: fetchReport,
@@ -218,67 +365,27 @@ export default function ReportsPage() {
     setGenerateKey("");
   }
 
-  function getCsvFilename() {
+  function getReportFilename() {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const base = "UMUGWANEZA_LTD";
     switch (reportType) {
-      case "daily": return `${base}_Daily_Report_${selectedDate}.csv`;
-      case "monthly": return `${base}_Monthly_Report_${months[parseInt(selectedMonth, 10) - 1]}_${selectedYear}.csv`;
-      case "custom": return `${base}_Custom_Report_${fromDate}_to_${toDate}.csv`;
-      case "purchases": return `${base}_Purchases_Report_${fromDate}_to_${toDate}.csv`;
-      case "sales": return `${base}_Sales_Report_${fromDate}_to_${toDate}.csv`;
-      case "profit": return `${base}_Profit_Report_${fromDate}_to_${toDate}.csv`;
-      case "outstanding_payables": return `${base}_Outstanding_Payables_${today}.csv`;
-      case "outstanding_receivables": return `${base}_Outstanding_Receivables_${today}.csv`;
-      case "stock_summary": return `${base}_Stock_Summary_${today}.csv`;
-      case "supplier_ledger": return `${base}_Supplier_Ledger_${fromDate}_to_${toDate}.csv`;
-      case "customer_ledger": return `${base}_Customer_Ledger_${fromDate}_to_${toDate}.csv`;
-      case "rental_outgoing": return `${base}_Rental_Outgoing_${fromDate}_to_${toDate}.csv`;
-      case "rental_incoming": return `${base}_Rental_Incoming_${fromDate}_to_${toDate}.csv`;
-      case "vehicle_utilization": return `${base}_Vehicle_Utilization_${fromDate}_to_${toDate}.csv`;
-      case "rental_profit": return `${base}_Rental_Profit_${fromDate}_to_${toDate}.csv`;
-      default: return `${base}_Report_${today}.csv`;
+      case "daily": return `${base}_Daily_Report_${selectedDate}.xlsx`;
+      case "monthly": return `${base}_Monthly_Report_${months[parseInt(selectedMonth, 10) - 1]}_${selectedYear}.xlsx`;
+      case "custom": return `${base}_Custom_Report_${fromDate}_to_${toDate}.xlsx`;
+      case "purchases": return `${base}_Purchases_Report_${fromDate}_to_${toDate}.xlsx`;
+      case "sales": return `${base}_Sales_Report_${fromDate}_to_${toDate}.xlsx`;
+      case "profit": return `${base}_Profit_Report_${fromDate}_to_${toDate}.xlsx`;
+      case "outstanding_payables": return `${base}_Outstanding_Payables_${today}.xlsx`;
+      case "outstanding_receivables": return `${base}_Outstanding_Receivables_${today}.xlsx`;
+      case "stock_summary": return `${base}_Stock_Summary_${today}.xlsx`;
+      case "supplier_ledger": return `${base}_Supplier_Ledger_${fromDate}_to_${toDate}.xlsx`;
+      case "customer_ledger": return `${base}_Customer_Ledger_${fromDate}_to_${toDate}.xlsx`;
+      case "rental_outgoing": return `${base}_Rental_Outgoing_${fromDate}_to_${toDate}.xlsx`;
+      case "rental_incoming": return `${base}_Rental_Incoming_${fromDate}_to_${toDate}.xlsx`;
+      case "vehicle_utilization": return `${base}_Vehicle_Utilization_${fromDate}_to_${toDate}.xlsx`;
+      case "rental_profit": return `${base}_Rental_Profit_${fromDate}_to_${toDate}.xlsx`;
+      default: return `${base}_Report_${today}.xlsx`;
     }
-  }
-
-  function escapeCsvCell(val: unknown): string {
-    if (val === null || val === undefined) return "";
-    const s = String(val);
-    if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) return `"${s.replace(/"/g, '""')}"`;
-    return s;
-  }
-
-  function downloadCSV() {
-    if (!reportData) return;
-    const csvRows: string[] = [];
-    const cols = getColumns();
-    csvRows.push(cols.map(c => escapeCsvCell(c.label)).join(","));
-    let rowsToExport: any[] = reportData?.rows || [];
-    if (activeGroup === "grocery" && ["daily", "monthly", "custom"].includes(reportType)) {
-      rowsToExport = rowsToExport.filter((r: any) => r.type !== "Rental Out" && r.type !== "Rental In");
-    } else if (activeGroup === "rental" && ["daily", "monthly", "custom"].includes(reportType)) {
-      rowsToExport = rowsToExport.filter((r: any) => r.type === "Rental Out" || r.type === "Rental In");
-    }
-    for (const row of rowsToExport) {
-      csvRows.push(cols.map(c => escapeCsvCell(row[c.key])).join(","));
-    }
-    const summaryLines = getSummaryLines();
-    if (summaryLines.length > 0) {
-      csvRows.push("");
-      csvRows.push(escapeCsvCell(t("reports.totals")));
-      for (const line of summaryLines) {
-        csvRows.push(`${escapeCsvCell(line.label)},${escapeCsvCell(line.value)}`);
-      }
-    }
-    const BOM = "\uFEFF";
-    const csv = BOM + csvRows.join("\r\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = getCsvFilename();
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   type ColDef = { key: string; label: string; align?: string };
@@ -286,6 +393,16 @@ export default function ReportsPage() {
   function getColumns(): ColDef[] {
     switch (reportType) {
       case "daily": case "monthly": case "custom":
+        if (activeGroup === "rental") {
+          return [
+            { key: "date", label: t("reports.date") },
+            { key: "vehicle", label: t("reports.col_vehicle") },
+            { key: "customer", label: t("reports.col_customer") },
+            { key: "dayUnits", label: t("rental_usage.day_units"), align: "right" },
+            { key: "hours", label: t("rental_usage.col_hours"), align: "right" },
+            { key: "charge", label: t("rental_usage.col_charge"), align: "right" },
+          ];
+        }
         return [
           { key: "date", label: t("reports.date") }, { key: "type", label: t("reports.type") },
           { key: "reference", label: t("reports.reference") }, { key: "party", label: t("reports.party") },
@@ -386,6 +503,7 @@ export default function ReportsPage() {
           { key: "totalRentalDays", label: t("reports.col_rental_days"), align: "right" },
           { key: "rentalCount", label: t("reports.col_rental_count"), align: "right" },
           { key: "totalRevenue", label: t("reports.col_revenue"), align: "right" },
+          { key: "utilization", label: t("reports.col_utilization"), align: "right" },
           { key: "availability", label: t("reports.col_availability"), align: "right" },
         ];
       case "rental_profit":
@@ -397,6 +515,16 @@ export default function ReportsPage() {
 
   function getSummaryLines(): { label: string; value: string }[] {
     if (!reportData) return [];
+    if (activeGroup === "rental" && ["daily", "monthly", "custom"].includes(reportType) && reportData.reportSource === "rental_usage") {
+      return [
+        { label: t("rental_usage.summary_total_charge"), value: `${formatRWF(reportData.totalBillable || 0)} RWF` },
+        { label: t("rental_usage.summary_total_day_units"), value: Number(reportData.totalDayUnits || 0).toFixed(2) },
+        { label: t("rental_usage.summary_active_vehicles"), value: String(reportData.activeVehicles || 0) },
+        { label: t("rental_usage.summary_avg_entry_charge"), value: `${formatRWF(reportData.averageEntryCharge || 0)} RWF` },
+        { label: t("rental_usage.summary_top_vehicle"), value: reportData.topVehicle ? `${reportData.topVehicle} • ${formatRWF(reportData.topVehicleCharge || 0)} RWF` : "—" },
+        { label: t("rental_usage.summary_top_customer"), value: reportData.topCustomer ? `${reportData.topCustomer} • ${formatRWF(reportData.topCustomerCharge || 0)} RWF` : "—" },
+      ];
+    }
     if (activeGroup === "rental" && ["daily", "monthly", "custom"].includes(reportType)) {
       const rev = reportData.totalRentalRevenue || 0;
       const cost = reportData.totalRentalCost || 0;
@@ -462,6 +590,24 @@ export default function ReportsPage() {
           { label: t("reports.col_total_paid"), value: formatRWF(reportData.totalPaid || 0) },
           { label: t("reports.col_total_outstanding"), value: formatRWF(reportData.totalOutstanding || 0) },
         ];
+      case "vehicle_utilization": {
+        const utilizationRows: any[] = reportData.rows || [];
+        const totalVehicles = utilizationRows.length;
+        const activeVehicles = utilizationRows.filter((row: any) => Number(row.totalRentalDays || 0) > 0).length;
+        const totalRentalDays = utilizationRows.reduce((sum: number, row: any) => sum + (Number(row.totalRentalDays) || 0), 0);
+        const totalRevenue = utilizationRows.reduce((sum: number, row: any) => sum + (Number(row.totalRevenue) || 0), 0);
+        const averageUtilization = totalVehicles > 0
+          ? utilizationRows.reduce((sum: number, row: any) => sum + Math.max(0, 100 - (Number(row.availability) || 0)), 0) / totalVehicles
+          : 0;
+
+        return [
+          { label: t("reports.col_total_vehicles"), value: String(totalVehicles) },
+          { label: t("reports.col_active_vehicles"), value: String(activeVehicles) },
+          { label: t("reports.col_total_rental_days"), value: String(totalRentalDays) },
+          { label: t("reports.col_total_revenue"), value: formatRWF(totalRevenue) },
+          { label: t("reports.col_avg_utilization"), value: `${averageUtilization.toFixed(1)}%` },
+        ];
+      }
       case "rental_profit":
         return [
           { label: t("reports.col_total_revenue"), value: formatRWF(reportData.totalRevenue || 0) },
@@ -477,19 +623,27 @@ export default function ReportsPage() {
     if (value === null || value === undefined) return "—";
     if (key === "status") return <Badge variant="secondary" data-testid={`badge-status-${value}`}>{String(value).replace(/_/g, " ")}</Badge>;
     if (key === "type") return <Badge variant="secondary">{value}</Badge>;
-    if (["total", "paid", "remaining", "received", "unit_price", "totalSales", "totalPurchases", "profit", "purchaseAmount", "paymentAmount", "balance", "saleAmount", "totalRevenue", "currentStock", "totalPurchased", "totalSold"].includes(key)) {
+    if (["total", "paid", "remaining", "received", "unit_price", "totalSales", "totalPurchases", "profit", "purchaseAmount", "paymentAmount", "balance", "saleAmount", "totalRevenue", "charge"].includes(key)) {
       return formatRWF(Number(value) || 0);
     }
-    if (key === "availability") return `${value}%`;
+    if (["currentStock", "totalPurchased", "totalSold", "totalRentalDays", "rentalCount"].includes(key)) {
+      return new Intl.NumberFormat("en-RW").format(Number(value) || 0);
+    }
+    if (key === "dayUnits") return Number(value || 0).toFixed(2);
+    if (key === "hours") return Number(value || 0) > 0 ? Number(value || 0).toFixed(1) : "—";
+    if (key === "availability" || key === "utilization") return `${value}%`;
     return String(value);
   }
 
   const columns = getColumns();
   const summaryLines = getSummaryLines();
   const rawRows: any[] = reportData?.rows || [];
+  const isRentalUsageReplica = activeGroup === "rental" && ["daily", "monthly", "custom"].includes(reportType) && reportData?.reportSource === "rental_usage";
   const isRentalUnified = activeGroup === "rental" && ["daily", "monthly", "custom"].includes(reportType);
   const isGroceryUnified = activeGroup === "grocery" && ["daily", "monthly", "custom"].includes(reportType);
-  const rows = isRentalUnified
+  const rows = isRentalUsageReplica
+    ? rawRows
+    : isRentalUnified
     ? rawRows.filter((r: any) => r.type === "Rental Out" || r.type === "Rental In")
     : isGroceryUnified
       ? rawRows.filter((r: any) => r.type !== "Rental Out" && r.type !== "Rental In")
@@ -498,8 +652,184 @@ export default function ReportsPage() {
   const reportError = hasReport && reportData?.error ? String(reportData.error) : null;
   const hasRows = rows.length > 0;
   const hasSummaryOnly = reportType === "rental_profit" && hasReport;
-  const canDownloadCsv = hasReport;
+  const canDownloadExcel = hasReport;
   const canGenerate = reportType === "supplier_ledger" ? !!supplierId : reportType === "customer_ledger" ? !!customerId : true;
+
+  const reportFilters = useMemo(() => {
+    const filters: { label: string; value: string }[] = [];
+    filters.push({ label: t("reports.report_type"), value: t(`reports.type_${reportType}`) });
+    if (activeGroup === "grocery" || activeGroup === "rental") {
+      filters.push({
+        label: t("reports.report_category"),
+        value: activeGroup === "grocery" ? t("reports.grocery_tab") : t("reports.rental_tab"),
+      });
+    }
+    if (reportType === "daily") {
+      filters.push({ label: t("reports.date"), value: selectedDate });
+    }
+    if (reportType === "monthly") {
+      filters.push({ label: t("reports.filter_month"), value: `${t(`reports.month_${selectedMonth}`)} ${selectedYear}` });
+    }
+    if (needsDateRange) {
+      filters.push({ label: t("reports.from_date"), value: fromDate });
+      filters.push({ label: t("reports.to_date"), value: toDate });
+    }
+    if (needsSupplier) {
+      const supplierName = (suppliers as any[])?.find((supplier: any) => supplier.id === supplierId)?.supplier_name;
+      filters.push({ label: t("reports.filter_supplier"), value: supplierName || t("reports.select_all") });
+    }
+    if (needsCustomer) {
+      const customerName = (customers as any[])?.find((customer: any) => customer.id === customerId)?.customer_name;
+      filters.push({ label: t("reports.filter_customer"), value: customerName || t("reports.select_all") });
+    }
+    return filters;
+  }, [
+    activeGroup,
+    customerId,
+    customers,
+    fromDate,
+    needsCustomer,
+    needsDateRange,
+    needsSupplier,
+    reportType,
+    selectedDate,
+    selectedMonth,
+    selectedYear,
+    supplierId,
+    suppliers,
+    t,
+    toDate,
+  ]);
+
+  const reportSummaryCards = useMemo(
+    () => summaryLines.map((line, index) => ({
+      ...line,
+      icon:
+        reportType === "vehicle_utilization"
+          ? index === 0
+            ? Truck
+            : index === 3
+              ? Wallet
+              : BarChart3
+          : index % 2 === 0
+            ? Wallet
+            : BarChart3,
+      accent:
+        index === 0 ? "bg-[#eff6ff] border-[#bfdbfe] text-[#1d4ed8]"
+        : index === 1 ? "bg-[#f0fdf4] border-[#bbf7d0] text-[#15803d]"
+        : index === 2 ? "bg-[#fffbeb] border-[#fde68a] text-[#b45309]"
+        : "bg-[#f8fafc] border-[#cbd5e1] text-[#334155]",
+    })),
+    [reportType, summaryLines],
+  );
+
+  function downloadExcel() {
+    if (!reportData) return;
+
+    const detailRows = rows.map((row: Record<string, unknown>) =>
+      Object.fromEntries(
+        columns.map((column) => [column.key, row[column.key] as string | number | boolean | null | undefined]),
+      ),
+    );
+
+    const sections = columns.length > 0
+      ? [
+          {
+            title: t("reports.detail_section"),
+            columns: columns.map((column) => ({ key: column.key, label: column.label })),
+            rows: detailRows,
+            emptyMessage: t("reports.no_data"),
+          },
+        ]
+      : [];
+
+    if (reportType === "vehicle_utilization" && rows.length > 0) {
+      const rankedVehicles = [...rows]
+        .sort((a: any, b: any) => (Number(b.totalRevenue) || 0) - (Number(a.totalRevenue) || 0))
+        .slice(0, 10)
+        .map((row: any) => ({
+          vehicle: row.vehicle,
+          type: row.type,
+          totalRentalDays: Number(row.totalRentalDays) || 0,
+          rentalCount: Number(row.rentalCount) || 0,
+          totalRevenue: Math.round(Number(row.totalRevenue) || 0),
+          utilization: `${Number(row.utilization) || 0}%`,
+          availability: `${Number(row.availability) || 0}%`,
+        }));
+
+      sections.push({
+        title: t("reports.vehicle_rankings"),
+        columns: [
+          { key: "vehicle", label: t("reports.col_vehicle") },
+          { key: "type", label: t("reports.type") },
+          { key: "totalRentalDays", label: t("reports.col_rental_days") },
+          { key: "rentalCount", label: t("reports.col_rental_count") },
+          { key: "totalRevenue", label: t("reports.col_revenue") },
+          { key: "utilization", label: t("reports.col_utilization") },
+          { key: "availability", label: t("reports.col_availability") },
+        ],
+        rows: rankedVehicles,
+        emptyMessage: t("reports.no_data"),
+      });
+    }
+
+    if (isRentalUsageReplica) {
+      const vehicleBreakdownRows: any[] = reportData.vehicleBreakdownRows || [];
+      const customerBreakdownRows: any[] = reportData.customerBreakdownRows || [];
+
+      sections.push({
+        title: t("rental_usage.vehicle_summary"),
+        columns: [
+          { key: "label", label: t("reports.col_vehicle") },
+          { key: "contractCount", label: t("rental_usage.col_contracts") },
+          { key: "entries", label: t("rental_usage.col_entries") },
+          { key: "dayUnits", label: t("rental_usage.day_units") },
+          { key: "hours", label: t("rental_usage.col_hours") },
+          { key: "charge", label: t("rental_usage.col_charge") },
+        ],
+        rows: vehicleBreakdownRows.map((row: any) => ({
+          label: row.label,
+          contractCount: row.contractCount,
+          entries: row.entries,
+          dayUnits: Number(row.dayUnits || 0).toFixed(2),
+          hours: Number(row.hours || 0).toFixed(1),
+          charge: Math.round(Number(row.charge) || 0),
+        })),
+        emptyMessage: t("reports.no_data"),
+      });
+
+      sections.push({
+        title: t("rental_usage.customer_summary"),
+        columns: [
+          { key: "label", label: t("reports.col_customer") },
+          { key: "contractCount", label: t("rental_usage.col_contracts") },
+          { key: "entries", label: t("rental_usage.col_entries") },
+          { key: "dayUnits", label: t("rental_usage.day_units") },
+          { key: "hours", label: t("rental_usage.col_hours") },
+          { key: "charge", label: t("rental_usage.col_charge") },
+        ],
+        rows: customerBreakdownRows.map((row: any) => ({
+          label: row.label,
+          contractCount: row.contractCount,
+          entries: row.entries,
+          dayUnits: Number(row.dayUnits || 0).toFixed(2),
+          hours: Number(row.hours || 0).toFixed(1),
+          charge: Math.round(Number(row.charge) || 0),
+        })),
+        emptyMessage: t("reports.no_data"),
+      });
+    }
+
+    exportReportWorkbook({
+      fileName: getReportFilename(),
+      sheetName: "report",
+      title: t("reports.export_title"),
+      subtitle: activeGroup === "grocery" ? t("reports.grocery_tab") : t("reports.rental_tab"),
+      filters: reportFilters,
+      metrics: reportSummaryCards.map((card) => ({ label: card.label, value: card.value })),
+      sections,
+    });
+  }
 
   function renderReportContent() {
     return (
@@ -596,13 +926,32 @@ export default function ReportsPage() {
               <Button className="h-10 bg-[#2563eb] transition-transform duration-200 hover:scale-[1.02]" onClick={handleGenerate} disabled={!canGenerate} data-testid="button-generate">
                 <Search className="h-4 w-4 mr-2" /> {t("reports.generate")}
               </Button>
-              <Button variant="outline" className="h-10 border-[#e2e8f0]" onClick={downloadCSV} disabled={!canDownloadCsv} data-testid="button-download-csv" title={canDownloadCsv ? t("reports.download_csv") : t("reports.generate_first_hint")}>
-                <Download className="h-4 w-4 mr-2" /> {t("reports.download_csv")}
+              <Button variant="outline" className="h-10 border-[#e2e8f0]" onClick={downloadExcel} disabled={!canDownloadExcel} data-testid="button-download-excel" title={canDownloadExcel ? t("reports.download_excel") : t("reports.generate_first_hint")}>
+                <Download className="h-4 w-4 mr-2" /> {t("reports.download_excel")}
               </Button>
               {!hasReport && <span className="text-sm text-[#64748b]">{t("reports.generate_first_hint")}</span>}
             </div>
           </CardContent>
         </Card>
+
+        {reportSummaryCards.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {reportSummaryCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div key={card.label} className={`rounded-xl border p-4 ${card.accent}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide opacity-80">{card.label}</p>
+                      <p className="mt-2 text-xl font-bold text-[#0f172a]">{card.value}</p>
+                    </div>
+                    <Icon className="h-5 w-5 opacity-80" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {reportType === "rental_profit" && reportData ? (
           <Card className="border border-[#e2e8f0] bg-white">
