@@ -34,7 +34,6 @@ export function Logo({ size = "md", className, inline, decorative }: LogoProps) 
       height={size === "xl" ? 56 : size === "lg" ? 40 : size === "sm" ? 32 : size === "xs" ? 24 : 36}
       className={cn("object-contain flex-shrink-0", sizeClasses[size], className)}
       loading="eager"
-      fetchPriority="high"
       {...(decorative && { "aria-hidden": true })}
     />
   );
@@ -43,3 +42,5 @@ export function Logo({ size = "md", className, inline, decorative }: LogoProps) 
 }
 
 export { LOGO_ALT };
+
+

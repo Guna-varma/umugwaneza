@@ -8,6 +8,7 @@ import type { RentalContract, InsertRentalContract, Vehicle, Customer, ExternalA
 import { insertRentalContractSchema, insertRentalPaymentSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,8 +23,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
-import { Plus, ArrowUpRight, ArrowDownLeft, CreditCard, AlertCircle, CalendarDays } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownLeft, CreditCard, AlertCircle, CalendarDays, SquarePen } from "lucide-react";
 import { perDayEquivalentRwf } from "@/lib/rentalUsage";
+import { updateOutgoingContract, OutgoingContractUpdateError } from "@/lib/rentalContracts";
 
 function formatRWF(amount: number) {
   return new Intl.NumberFormat("en-RW").format(Math.round(amount)) + " RWF";
@@ -67,6 +69,48 @@ function calculateTotal(start: string, end: string, rate: number, rentalType: st
   return Math.ceil(days) * rate;
 }
 
+function toDatetimeLocal(value: string) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const tzOffsetMs = d.getTimezoneOffset() * 60000;
+  const local = new Date(d.getTime() - tzOffsetMs);
+  return local.toISOString().slice(0, 16);
+}
+
+const editOutgoingContractSchema = z.object({
+  rental_start_datetime: z.string().min(1, "Start date is required"),
+  rental_end_datetime: z.string().min(1, "End date is required"),
+  rate: z.number().positive("Rate must be positive"),
+  rental_type: z.enum(["DAY", "HOUR", "MONTH"]),
+  location: z.string().nullable().default(null),
+  notes: z.string().nullable().default(null),
+});
+
+type EditOutgoingContractInput = z.infer<typeof editOutgoingContractSchema>;
+
+function describeEditError(error: unknown) {
+  if (error instanceof OutgoingContractUpdateError) {
+    if (error.code === "INVALID_DATE_RANGE") {
+      return "End date/time must be after start date/time.";
+    }
+    if (error.code === "OVERLAP_CONFLICT") {
+      return "This timeline overlaps with another active contract for this vehicle.";
+    }
+    if (error.code === "USAGE_OUT_OF_RANGE") {
+      const count = Number(error.details?.count || 0);
+      const dates = Array.isArray(error.details?.dates) ? error.details?.dates : [];
+      const datePreview = dates.slice(0, 3).join(", ");
+      return count > 0
+        ? `Cannot save because ${count} usage entr${count === 1 ? "y is" : "ies are"} outside this date range (${datePreview}${count > 3 ? ", ..." : ""}).`
+        : "Cannot save because some usage entries are outside this date range.";
+    }
+    if (error.code === "NOT_EDITABLE_STATUS") {
+      return "Only ACTIVE outgoing contracts can be edited.";
+    }
+  }
+  return error instanceof Error ? error.message : "Failed to update contract.";
+}
 export default function RentalsPage({ direction }: { direction: "OUTGOING" | "INCOMING" }) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -76,6 +120,9 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
   const [payOpen, setPayOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<RentalContract | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [editingContract, setEditingContract] = useState<RentalContract | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const isOutgoing = direction === "OUTGOING";
 
@@ -134,16 +181,34 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
     },
   });
 
+  const editForm = useForm<EditOutgoingContractInput>({
+    resolver: zodResolver(editOutgoingContractSchema),
+    defaultValues: {
+      rental_start_datetime: "",
+      rental_end_datetime: "",
+      rate: 0,
+      rental_type: "DAY",
+      location: null,
+      notes: null,
+    },
+  });
+
+
   const vehicleId = form.watch("vehicle_id");
   const startDt = form.watch("rental_start_datetime");
   const endDt = form.watch("rental_end_datetime");
   const rate = form.watch("rate");
   const formRentalType = form.watch("rental_type");
+  const editStartDt = editForm.watch("rental_start_datetime");
+  const editEndDt = editForm.watch("rental_end_datetime");
+  const editRate = editForm.watch("rate");
+  const editRentalType = editForm.watch("rental_type");
   // Only AVAILABLE vehicles can be booked (exclude MAINTENANCE, RENTED_OUT, RENTED_IN).
   const vehiclesForForm = (vehicles ?? []).filter((v) => v.current_status === "AVAILABLE");
   const selectedVehicle = vehicles?.find((v) => v.id === vehicleId);
   const rentalType = isOutgoing ? (formRentalType || "DAY") : (selectedVehicle?.rental_type || "DAY");
   const autoTotal = calculateTotal(startDt, endDt, rate, rentalType);
+  const editAutoTotal = calculateTotal(editStartDt, editEndDt, Number(editRate) || 0, editRentalType || "DAY");
   const isVehicleAvailable = !selectedVehicle || selectedVehicle.current_status === "AVAILABLE";
 
   // Outgoing: suggest charge type by vehicle type (trucks → day, machines → hour). Not mandatory—user can change.
@@ -191,6 +256,36 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
+  const editMutation = useMutation({
+    mutationFn: async (values: EditOutgoingContractInput) => {
+      if (!editingContract) {
+        throw new Error("No contract selected for editing.");
+      }
+      return updateOutgoingContract(businessId, editingContract.id, {
+        rental_start_datetime: values.rental_start_datetime,
+        rental_end_datetime: values.rental_end_datetime,
+        rate: values.rate,
+        rental_type: values.rental_type,
+        location: values.location || null,
+        notes: values.notes || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "rental_contracts", businessId, direction] });
+      queryClient.invalidateQueries({ queryKey: ["umugwaneza", "rental_usage"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["report"] });
+      toast({ title: "Contract updated successfully." });
+      setEditError(null);
+      setEditingContract(null);
+      setEditOpen(false);
+    },
+    onError: (error: unknown) => {
+      const message = describeEditError(error);
+      setEditError(message);
+      toast({ title: t("common.error"), description: message, variant: "destructive" });
+    },
+  });
   const completeMutation = useMutation({
     mutationFn: async (contract: RentalContract) => {
       const { error: err1 } = await db().from("rental_contracts").update({ operational_status: "COMPLETED" }).eq("id", contract.id);
@@ -338,6 +433,90 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
         </Dialog>
       </div>
 
+      <Dialog
+        open={editOpen}
+        onOpenChange={(next) => {
+          setEditOpen(next);
+          if (!next) {
+            setEditError(null);
+            setEditingContract(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Edit Contract</DialogTitle></DialogHeader>
+          {editingContract && (
+            <Form {...editForm}>
+              <form
+                onSubmit={editForm.handleSubmit((values) => {
+                  setEditError(null);
+                  const start = new Date(values.rental_start_datetime).getTime();
+                  const end = new Date(values.rental_end_datetime).getTime();
+                  if (!(start < end)) {
+                    editForm.setError("rental_end_datetime", { message: "End date/time must be after start date/time." });
+                    return;
+                  }
+                  editMutation.mutate(values);
+                })}
+                className="space-y-4 pr-6 sm:pr-0"
+              >
+                <div className="rounded-lg border border-[#e2e8f0] p-3 bg-[#f8fafc] text-sm space-y-1">
+                  <div><span className="text-[#64748b]">Vehicle:</span> <span className="text-[#1e293b] font-medium">{editingContract.vehicle?.vehicle_name || "—"}</span></div>
+                  <div>
+                    <span className="text-[#64748b]">Customer:</span>{" "}
+                    <span className="text-[#1e293b] font-medium">{editingContract.customer?.customer_name || "—"}</span>
+                  </div>
+                </div>
+
+                {editError && (
+                  <Alert variant="destructive" className="py-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{editError}</AlertDescription>
+                  </Alert>
+                )}
+
+                <FormField control={editForm.control} name="rental_type" render={({ field }) => (
+                  <FormItem><FormLabel>{t("rentals.charge_customer_per")}</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="DAY">{t("vehicles.day")}</SelectItem>
+                        <SelectItem value="MONTH">{t("vehicles.month")}</SelectItem>
+                        <SelectItem value="HOUR">{t("vehicles.hour")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={editForm.control} name="rental_start_datetime" render={({ field }) => (
+                  <FormItem><FormLabel>{t("rentals.start_datetime")}</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={editForm.control} name="rental_end_datetime" render={({ field }) => (
+                  <FormItem><FormLabel>{t("rentals.end_datetime")}</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={editForm.control} name="rate" render={({ field }) => (
+                  <FormItem><FormLabel>{editRentalType === "HOUR" ? t("rentals.rate_per_hour") : editRentalType === "MONTH" ? t("rentals.rate_per_month") : t("rentals.rate_per_day")}</FormLabel><FormControl><AmountInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <div className="rounded-lg border border-[#e2e8f0] p-3 bg-[#f1f5f9]">
+                  <div className="flex justify-between text-sm"><span className="text-[#64748b]">{t("rentals.estimated_total")}</span><span className="font-semibold text-[#1e293b]">{formatRWF(editAutoTotal)}</span></div>
+                </div>
+
+                <FormField control={editForm.control} name="location" render={({ field }) => (
+                  <FormItem><FormLabel>{t("rentals.location")}</FormLabel><FormControl><Input value={field.value || ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={editForm.control} name="notes" render={({ field }) => (
+                  <FormItem><FormLabel>{t("rentals.notes")}</FormLabel><FormControl><Textarea value={field.value || ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                )} />
+
+                <Button type="submit" className="w-full h-12 bg-[#2563eb]" disabled={editMutation.isPending} data-testid="button-save-edit-rental">
+                  {editMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </form>
+            </Form>
+          )}
+        </DialogContent>
+      </Dialog>
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>{t("rentals.record_payment")}</DialogTitle></DialogHeader>
@@ -469,6 +648,28 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
                               </Link>
                             </Button>
                           )}
+                          {isOutgoing && c.operational_status === "ACTIVE" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditError(null);
+                                setEditingContract(c);
+                                editForm.reset({
+                                  rental_start_datetime: toDatetimeLocal(c.rental_start_datetime),
+                                  rental_end_datetime: toDatetimeLocal(c.rental_end_datetime),
+                                  rate: Number(c.rate) || 0,
+                                  rental_type: (c.rental_type || "DAY") as "DAY" | "HOUR" | "MONTH",
+                                  location: c.location || null,
+                                  notes: c.notes || null,
+                                });
+                                setEditOpen(true);
+                              }}
+                              data-testid={`button-edit-${c.id}`}
+                            >
+                              <SquarePen className="h-3.5 w-3.5 mr-1" /> Edit
+                            </Button>
+                          )}
                           {c.operational_status === "ACTIVE" && c.remaining_amount > 0 && (
                             <Button variant="outline" size="sm" onClick={() => {
                               setSelectedContract(c);
@@ -492,3 +693,12 @@ export default function RentalsPage({ direction }: { direction: "OUTGOING" | "IN
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
